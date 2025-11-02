@@ -29,37 +29,32 @@ model User {
   email     String   @unique
   password  String
   name      String?
-  role      UserRole     @default(ADMIN)
+  role      UserRole @default(ADMIN)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Link to Technician profile (optional - only for technicians)
   technicianId String?     @unique
   technician   Technician? @relation(fields: [technicianId], references: [id])
 
   // Relationship to tokens/sessions
   sessions Session[]
+  @@map("users")
 }
 
 // Model for managing long-term user sessions and tokens.
 model Session {
   id     String @id @default(uuid())
-  userId String @unique
+  userId String
   user   User   @relation(fields: [userId], references: [id])
 
-  // Storage for authentication tokens
-  accessToken  String
   refreshToken String   @unique
   expiresAt    DateTime
-  isActive Boolean
+  isActive     Boolean  @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-// ------------------------------------
-// APPLICATION MODELS (Based on Screenshots)
-// ------------------------------------
 
 // Model for managing field technicians
 model Technician {
@@ -78,14 +73,14 @@ model Technician {
   updatedAt DateTime @updatedAt
 }
 
-// Model for predefined work time slots (from Settings screen)
+
 model TimeSlot {
   id        String @id @default(uuid())
   label     String // E.g., "8:00 AM - 10:00 AM"
-  startTime String
-  endTime   String
+  startTime DateTime
+  endTime   DateTime
 
-  jobs Job[] // Jobs scheduled in this slot
+  jobs Job[] 
 
   createdAt DateTime @default(now())
 }
@@ -103,7 +98,7 @@ model Job {
   zipCode        String?
 
   // Scheduling and assignment
-  scheduledDate DateTime @db.Date
+  scheduledDate DateTime 
   timeSlotId    String
   timeSlot      TimeSlot @relation(fields: [timeSlotId], references: [id])
 
