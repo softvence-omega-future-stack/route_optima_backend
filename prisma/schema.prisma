@@ -13,33 +13,29 @@ generator client {
 // ENUMS
 // ------------------------------------
 
-// Defines the user roles. Only ADMIN is supported as requested.
-enum Role {
+enum UserRole {
   ADMIN
-  // TECHNICIAN (You might add this if you ever expand the system to allow technicians to log in)
+  TECHNICIAN
 }
 
-// Defines the status of a job, based on the job list screen.
 enum JobStatus {
   PENDING
   ASSIGNED
   COMPLETED
 }
 
-// ------------------------------------
-// AUTHENTICATION MODELS
-// ------------------------------------
-
-// The main user model, representing Dispatchers or Administrators.
-// All users default to the ADMIN role as requested.
 model User {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   email     String   @unique
-  password  String   // Hashed password storage
-  name      String?  // Name of the Admin/Dispatcher
-  role      Role     @default(ADMIN) // Mandatory ADMIN role
+  password  String
+  name      String?
+  role      UserRole     @default(ADMIN)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Link to Technician profile (optional - only for technicians)
+  technicianId String?     @unique
+  technician   Technician? @relation(fields: [technicianId], references: [id])
 
   // Relationship to tokens/sessions
   sessions Session[]
@@ -47,17 +43,18 @@ model User {
 
 // Model for managing long-term user sessions and tokens.
 model Session {
-  id            String   @id @default(cuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id])
-  
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
   // Storage for authentication tokens
-  accessToken   String   // Stores the current access token (for fulfilling the request)
-  refreshToken  String   @unique
-  expiresAt     DateTime // Expiration date of the refresh token
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  accessToken  String
+  refreshToken String   @unique
+  expiresAt    DateTime
+  isActive Boolean
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ------------------------------------
@@ -66,56 +63,55 @@ model Session {
 
 // Model for managing field technicians
 model Technician {
-  id          String    @id @default(cuid())
-  name        String
-  phone       String?
-  region      String?   // E.g., "West Coast", "Midwest"
-  workHours   String?   // E.g., "8:00 AM - 6:00 PM"
-  isActive    Boolean   @default(true)
-  
-  // Relationship to jobs assigned to this technician
-  jobs        Job[]
-  
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id        String  @id @default(uuid())
+  name      String
+  phone     String?
+  region    String?
+  workHours String?
+  isActive  Boolean @default(true)
+
+  user User?
+
+  jobs Job[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Model for predefined work time slots (from Settings screen)
 model TimeSlot {
-  id          String    @id @default(cuid())
-  label       String    // E.g., "8:00 AM - 10:00 AM"
-  startTime   String    
-  endTime     String
+  id        String @id @default(uuid())
+  label     String // E.g., "8:00 AM - 10:00 AM"
+  startTime String
+  endTime   String
 
-  jobs        Job[]     // Jobs scheduled in this slot
-  
-  createdAt   DateTime @default(now())
+  jobs Job[] // Jobs scheduled in this slot
+
+  createdAt DateTime @default(now())
 }
-
 
 // Model for a scheduled job or appointment
 model Job {
-  id             String      @id @default(cuid())
+  id             String  @id @default(uuid())
   customerName   String
   customerPhone  String?
   customerEmail  String?
   jobDescription String?
-  
+
   // Location details
   serviceAddress String
   zipCode        String?
-  
-  // Scheduling and assignment
-  scheduledDate  DateTime    @db.Date
-  timeSlotId     String
-  timeSlot       TimeSlot    @relation(fields: [timeSlotId], references: [id])
-  
-  technicianId   String
-  technician     Technician  @relation(fields: [technicianId], references: [id])
-  
-  status         JobStatus   @default(PENDING)
-  
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-}
 
+  // Scheduling and assignment
+  scheduledDate DateTime @db.Date
+  timeSlotId    String
+  timeSlot      TimeSlot @relation(fields: [timeSlotId], references: [id])
+
+  technicianId String
+  technician   Technician @relation(fields: [technicianId], references: [id])
+
+  status JobStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
