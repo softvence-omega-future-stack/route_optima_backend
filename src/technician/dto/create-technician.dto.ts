@@ -21,6 +21,10 @@ export class CreateTechnicianDto {
   workEndTime?: string;
 
   @IsOptional()
+  @IsString()
+  photo?: string;
+
+  @IsOptional()
   @IsBoolean()
   isActive?: boolean = true;
 }

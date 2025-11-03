@@ -29,7 +29,7 @@ model User {
   email     String   @unique
   password  String
   name      String?
-  photoURL String?
+  photo     String?
   role      UserRole @default(ADMIN)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -56,13 +56,14 @@ model Session {
 
 // Model for managing field technicians
 model Technician {
-  id        String  @id @default(uuid())
-  name      String
-  phone     String?
-  region    String?
+  id            String    @id @default(uuid())
+  name          String
+  phone         String?
+  region        String?
+  photo         String?
   workStartTime DateTime?
   workEndTime   DateTime?
-  isActive  Boolean @default(true)
+  isActive      Boolean   @default(true)
 
   user User?
 
