@@ -159,7 +159,7 @@ async login(loginData: LoginDto, userAgent?: string, req?: any) {
 
   await this.prisma.session.update({
     where: { id: session.id },
-    data: { isActive: false, refreshToken: '' },
+    data: { isActive: false, refreshToken: null },
   });
 
   return true;
