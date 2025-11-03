@@ -1,37 +1,21 @@
-// import { NestFactory } from '@nestjs/core';
-// import { AppModule } from './app.module';
-// import cookieParser from 'cookie-parser';
-
-// async function bootstrap() {
-//   const app = await NestFactory.create(AppModule, {
-//     logger: false,
-//   });
-
-//   //middleware
-//   app.use(cookieParser());
-//   app.enableCors({
-//     origin: 'http://localhost:3000',
-//     credentials: true,
-//   });
-
-//   await app.listen(process.env.PORT ?? 3000);
-
-//   console.log(`🚀 Server is running on 3000`);
-// }
-// bootstrap();
-
-
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser';
 import * as dotenv from 'dotenv';
+import { join } from 'path';
+import { NestExpressApplication } from '@nestjs/platform-express';
 
 // Load environment variables from .env file
 dotenv.config();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: false,
+  });
+
+  // Serve static files from /uploads
+  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+    prefix: '/uploads/',
   });
 
   // Middleware
