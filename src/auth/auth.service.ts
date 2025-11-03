@@ -54,31 +54,31 @@ export class AuthService {
     };
   }
 
-  async login(loginData: LoginDto, userAgent?: string, req?: any) {
-    const { email, password } = loginData;
+async login(loginData: LoginDto, userAgent?: string, req?: any) {
+  const { email, password } = loginData;
 
-    if (!email) throw new BadRequestException('Email must be provided');
+  if (!email) throw new BadRequestException('Email must be provided');
 
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-    });
+  const user = await this.prisma.user.findUnique({
+    where: { email },
+  });
 
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+  if (!user) throw new UnauthorizedException('Invalid credentials');
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid)
-      throw new UnauthorizedException('Invalid credentials');
+  const isPasswordValid = await bcrypt.compare(password, user.password);
+  if (!isPasswordValid)
+    throw new UnauthorizedException('Invalid credentials');
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role);
+  const tokens = await this.generateTokens(user.id, user.email, user.role);
+  await this.createSession(user.id, tokens.refreshToken);
 
-    await this.createSession(user.id, tokens.refreshToken);
+  return {
+    user: this.excludePassword(user),
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+  };
+}
 
-    return {
-      user: this.excludePassword(user),
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-    };
-  }
 
   // * refresh token
   async refreshTokens(refreshToken: string) {
@@ -143,6 +143,28 @@ export class AuthService {
 
     return true;
   }
+
+  async logoutByToken(refreshToken: string) {
+  if (!refreshToken) {
+    throw new BadRequestException('Refresh token is required');
+  }
+
+  const session = await this.prisma.session.findFirst({
+    where: { refreshToken, isActive: true },
+  });
+
+  if (!session) {
+    throw new BadRequestException('Session not found or already inactive');
+  }
+
+  await this.prisma.session.update({
+    where: { id: session.id },
+    data: { isActive: false, refreshToken: '' },
+  });
+
+  return true;
+}
+
 
   // * generate token
   private async generateTokens(userId: string, email: string, role: string) {

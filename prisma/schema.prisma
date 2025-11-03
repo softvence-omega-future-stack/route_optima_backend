@@ -38,7 +38,6 @@ model User {
 
   // Relationship to tokens/sessions
   sessions Session[]
-  @@map("users")
 }
 
 // Model for managing long-term user sessions and tokens.
