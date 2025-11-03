@@ -8,12 +8,16 @@ export class TechnicianService {
 
   async createTechnician(dto: CreateTechnicianDto) {
     // optional: check if technician already exists by phone number
-    if (dto.phone) {
+   try {
+      if (dto.phone) {
       const existing = await this.prisma.technician.findFirst({
         where: { phone: dto.phone },
       });
       if (existing) throw new BadRequestException('Technician with this phone already exists');
     }
+   } catch (error) {
+     console.log(error)
+   }
 
     const technician = await this.prisma.technician.create({
       data: {
@@ -23,6 +27,7 @@ export class TechnicianService {
         workStartTime: dto.workStartTime ? new Date(dto.workStartTime) : null,
         workEndTime: dto.workEndTime ? new Date(dto.workEndTime) : null,
         isActive: dto.isActive ?? true,
+        photo: dto.photo,
       },
     });
 

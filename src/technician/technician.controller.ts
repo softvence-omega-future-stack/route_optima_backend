@@ -30,14 +30,15 @@ export class TechnicianController {
     @Body('data') data: string,
   ) {
     try {
+      console.log(file)
       // Parse the JSON string
       const technicianData: CreateTechnicianDto = JSON.parse(data);
 
       // Add the photo path if uploaded
       if (file) {
-        technicianData.photo = `/uploads/${file.filename}`;
+        technicianData.photo = `/uploads/${file.path}`;
       }
-
+        console.log(technicianData)
       return this.technicianService.createTechnician(technicianData);
     } catch (error) {
       console.log(error)
