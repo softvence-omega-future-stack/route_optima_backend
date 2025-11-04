@@ -5,8 +5,10 @@ import * as dotenv from 'dotenv';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
-// Load environment variables from .env file
-dotenv.config();
+// Load .env only in development
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
