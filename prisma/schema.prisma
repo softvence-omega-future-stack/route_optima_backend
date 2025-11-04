@@ -29,6 +29,7 @@ model User {
   email     String   @unique
   password  String
   name      String?
+  photo     String?
   role      UserRole @default(ADMIN)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -36,9 +37,8 @@ model User {
   technicianId String?     @unique
   technician   Technician? @relation(fields: [technicianId], references: [id])
 
-  // Relationship to tokens/sessions
-  sessions Session[]
-  @@map("users")
+  sessions           Session[]
+  PasswordResetToken PasswordResetToken[]
 }
 
 // Model for managing long-term user sessions and tokens.
@@ -47,7 +47,7 @@ model Session {
   userId String
   user   User   @relation(fields: [userId], references: [id])
 
-  refreshToken String   @unique
+  refreshToken String?
   expiresAt    DateTime
   isActive     Boolean  @default(true)
 
@@ -55,32 +55,48 @@ model Session {
   updatedAt DateTime @updatedAt
 }
 
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
 
 // Model for managing field technicians
 model Technician {
-  id        String  @id @default(uuid())
-  name      String
-  phone     String?
-  region    String?
-  workHours String?
-  isActive  Boolean @default(true)
+  id            String    @id @default(uuid())
+  name          String
+  phone         String    @unique
+  region        String?
+  photo         String?
+  workStartTime DateTime?
+  workEndTime   DateTime?
+  isActive      Boolean   @default(true)
 
   user User?
 
-  jobs Job[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  jobs      Job[]
+  slots     TimeSlot[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 }
 
-
 model TimeSlot {
-  id        String @id @default(uuid())
-  label     String // E.g., "8:00 AM - 10:00 AM"
+  id        String   @id @default(uuid())
+  label     String
   startTime DateTime
   endTime   DateTime
+  date      DateTime
 
-  jobs Job[] 
+  technicianId String
+  technician   Technician @relation(fields: [technicianId], references: [id])
+
+  isBooked Boolean @default(false)
+
+  jobs Job[]
 
   createdAt DateTime @default(now())
 }
@@ -97,8 +113,12 @@ model Job {
   serviceAddress String
   zipCode        String?
 
+  latitude  Float?
+  longitude Float?
+  state     String?
+
   // Scheduling and assignment
-  scheduledDate DateTime 
+  scheduledDate DateTime
   timeSlotId    String
   timeSlot      TimeSlot @relation(fields: [timeSlotId], references: [id])
 
