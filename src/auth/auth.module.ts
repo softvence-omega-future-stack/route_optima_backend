@@ -9,7 +9,7 @@ import { AuthGuard } from './guards/jwt-auth-guard';
   imports: [
     PrismaModule,
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'default-secret-key',
+      secret: process.env.JWT_SECRET || 'default-access-secret-key',
       signOptions: { expiresIn: '15m' },
     }),
   ],

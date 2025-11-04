@@ -58,7 +58,7 @@ model Session {
 model Technician {
   id            String    @id @default(uuid())
   name          String
-  phone         String?
+  phone         String    @unique
   region        String?
   photo         String?
   workStartTime DateTime?

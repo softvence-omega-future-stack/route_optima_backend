@@ -23,7 +23,7 @@ import { TechnicianModule } from './technician/technician.module';
     JobsModule,
     TechnicianModule,
   ],
-  controllers: [AppController, JobsController, TechnicianController],
-  providers: [AppService, JobsService, TechnicianService],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

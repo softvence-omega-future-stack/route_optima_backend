@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, HttpStatus, Post, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, HttpStatus, Post, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { TechnicianService } from './technician.service';
 import { CreateTechnicianDto } from './dto/create-technician.dto';
 import { sendResponse } from 'src/lib/responseHandler';
@@ -6,6 +6,10 @@ import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
+import { AuthGuard } from 'src/auth/guards/jwt-auth-guard';
+import { RolesGuard } from 'src/auth/guards/role-guard';
+import { AuthRoles } from 'src/common/decorators/roles.decorator';
+import { UserRole } from '@prisma/client';
 
 
 @Controller('api/v1/technician')
@@ -25,6 +29,8 @@ export class TechnicianController {
       }),
     }),
   )
+  @UseGuards(AuthGuard, RolesGuard)
+  @AuthRoles(UserRole.ADMIN)
   async addTechnician(
     @UploadedFile() file: Express.Multer.File,
     @Body('data') data: string,

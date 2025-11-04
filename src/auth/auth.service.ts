@@ -171,7 +171,7 @@ async login(loginData: LoginDto, userAgent?: string, req?: any) {
     const payload = { sub: userId, email, role };
 
     const accessToken = await this.jwtService.signAsync(payload, {
-      secret: process.env.JWT_ACCESS_SECRET || 'default-access-secret-key',
+      secret: process.env.JWT_SECRET || 'default-access-secret-key',
       expiresIn: '15m',
     });
 
