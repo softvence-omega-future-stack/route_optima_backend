@@ -11,13 +11,17 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from 'prisma/prisma.service';
 import { User } from '@prisma/client';
 import { v4 as uuid } from 'uuid';
+import { MailService } from 'src/mail/mail.service';
+import { randomBytes } from 'crypto';
+import { addMinutes } from 'date-fns';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-  ) {}
+    private readonly mailService: MailService,
+  ) { }
 
   async register(registerDto: RegisterDto) {
     const { email, password, name } = registerDto;
@@ -54,30 +58,30 @@ export class AuthService {
     };
   }
 
-async login(loginData: LoginDto, userAgent?: string, req?: any) {
-  const { email, password } = loginData;
+  async login(loginData: LoginDto, userAgent?: string, req?: any) {
+    const { email, password } = loginData;
 
-  if (!email) throw new BadRequestException('Email must be provided');
+    if (!email) throw new BadRequestException('Email must be provided');
 
-  const user = await this.prisma.user.findUnique({
-    where: { email },
-  });
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
 
-  if (!user) throw new UnauthorizedException('Invalid credentials');
+    if (!user) throw new UnauthorizedException('Invalid credentials');
 
-  const isPasswordValid = await bcrypt.compare(password, user.password);
-  if (!isPasswordValid)
-    throw new UnauthorizedException('Invalid credentials');
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid)
+      throw new UnauthorizedException('Invalid credentials');
 
-  const tokens = await this.generateTokens(user.id, user.email, user.role);
-  await this.createSession(user.id, tokens.refreshToken);
+    const tokens = await this.generateTokens(user.id, user.email, user.role);
+    await this.createSession(user.id, tokens.refreshToken);
 
-  return {
-    user: this.excludePassword(user),
-    accessToken: tokens.accessToken,
-    refreshToken: tokens.refreshToken,
-  };
-}
+    return {
+      user: this.excludePassword(user),
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
+  }
 
 
   // * refresh token
@@ -145,25 +149,106 @@ async login(loginData: LoginDto, userAgent?: string, req?: any) {
   }
 
   async logoutByToken(refreshToken: string) {
-  if (!refreshToken) {
-    throw new BadRequestException('Refresh token is required');
+    if (!refreshToken) {
+      throw new BadRequestException('Refresh token is required');
+    }
+
+    const session = await this.prisma.session.findFirst({
+      where: { refreshToken, isActive: true },
+    });
+
+    if (!session) {
+      throw new BadRequestException('Session not found or already inactive');
+    }
+
+    await this.prisma.session.update({
+      where: { id: session.id },
+      data: { isActive: false, refreshToken: null },
+    });
+
+    return true;
   }
 
-  const session = await this.prisma.session.findFirst({
-    where: { refreshToken, isActive: true },
-  });
+  // --- REQUEST RESET LINK ---
+  async requestPasswordReset(email: string) {
+    try {
+      const user = await this.prisma.user.findUnique({ where: { email } });
+      if (!user) {
+        throw new BadRequestException('No account found with this email address');
+      }
 
-  if (!session) {
-    throw new BadRequestException('Session not found or already inactive');
+      const token = randomBytes(32).toString('hex');
+
+      await this.prisma.passwordResetToken.create({
+        data: {
+          token,
+          userId: user.id,
+          expiresAt: addMinutes(new Date(), 15), // expires in 15 minutes
+        },
+      });
+
+      // send email
+      await this.mailService.sendPasswordResetMail(user.email, token);
+
+      return { message: 'Password reset email sent successfully' };
+    } catch (error) {
+      console.error('Error in requestPasswordReset:', error);
+
+      // Check for known NestJS error types or Prisma errors
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      // Fallback: wrap unknown errors in an HTTP exception
+      throw new BadRequestException(
+        error.message || 'Failed to process password reset request',
+      );
+    }
   }
 
-  await this.prisma.session.update({
-    where: { id: session.id },
-    data: { isActive: false, refreshToken: null },
-  });
+  // --- VERIFY & RESET PASSWORD ---
+  async resetPassword(token: string, newPassword: string) {
+    try {
+      //  Find token and associated user
+      const resetToken = await this.prisma.passwordResetToken.findUnique({
+        where: { token },
+        include: { user: true },
+      });
 
-  return true;
-}
+      // Validate token
+      if (!resetToken) throw new BadRequestException('Invalid or missing token');
+      if (resetToken.used) throw new BadRequestException('Token has already been used');
+      if (resetToken.expiresAt < new Date()) throw new BadRequestException('Token has expired');
+
+      // Hash new password
+      const hashed = await bcrypt.hash(newPassword, 12);
+
+      // Perform updates in a transaction
+      await this.prisma.$transaction([
+        this.prisma.user.update({
+          where: { id: resetToken.userId },
+          data: { password: hashed },
+        }),
+        this.prisma.passwordResetToken.update({
+          where: { id: resetToken.id },
+          data: { used: true },
+        }),
+      ]);
+
+      // Return success
+      return { message: 'Password reset successful' };
+    } catch (error) {
+      console.error('Error in resetPassword:', error);
+
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      // Fallback: wrap other errors
+      throw new BadRequestException(error.message || 'Failed to reset password');
+    }
+  }
+
 
 
   // * generate token

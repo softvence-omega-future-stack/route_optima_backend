@@ -20,64 +20,63 @@ import type { CustomCookiesResponse } from 'src/common/types/cookiesResponse.typ
 export class AuthController {
   constructor(private readonly authService: AuthService) { }
 
-@Post('register')
-@UsePipes(new ValidationPipe())
-async register(@Body() userRegistrationData: RegisterDto, @Res() res: Response) {
-  try {
-    const { user } = await this.authService.register(userRegistrationData);
-    return res
-      .status(HttpStatus.CREATED)
-      .json(sendResponse(HttpStatus.CREATED, true, 'User created successfully', user));
-  } catch (error) {
-    const status = error.status || error.statusCode || HttpStatus.BAD_REQUEST;
-    return res
-      .status(status)
-      .json(sendResponse(status, false, 'User creation failed', error));
+  @Post('register')
+  @UsePipes(new ValidationPipe())
+  async register(@Body() userRegistrationData: RegisterDto, @Res() res: Response) {
+    try {
+      const { user } = await this.authService.register(userRegistrationData);
+      return res
+        .status(HttpStatus.CREATED)
+        .json(sendResponse(HttpStatus.CREATED, true, 'User created successfully', user));
+    } catch (error) {
+      const status = error.status || error.statusCode || HttpStatus.BAD_REQUEST;
+      return res
+        .status(status)
+        .json(sendResponse(status, false, 'User creation failed', error));
+    }
   }
-}
 
 
+  @Post('login')
+  @HttpCode(200)
+  async login(
+    @Body() loginDto: LoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: CustomCookiesResponse,
+  ) {
+    try {
+      const loginResult = await this.authService.login(loginDto);
 
-@Post('login')
-@HttpCode(200)
-async login(
-  @Body() loginDto: LoginDto,
-  @Req() req: Request,
-  @Res({ passthrough: true }) res: CustomCookiesResponse,
-) {
-  try {
-    const loginResult = await this.authService.login(loginDto);
+      res.cookie('access_token', loginResult.accessToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        maxAge: 1000 * 60 * 15, // 15 minutes
+      });
 
-    res.cookie('access_token', loginResult.accessToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-      maxAge: 1000 * 60 * 15, // 15 minutes
-    });
+      res.cookie('refresh_token', loginResult.refreshToken, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+      });
 
-    res.cookie('refresh_token', loginResult.refreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
-    });
-
-    return {
-      success: true,
-      message: 'Logged in successfully',
-      token: {
-        accessToken: loginResult.accessToken,
-        refreshToken: loginResult.refreshToken
-      }
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: 'Login failed',
-      error: error.message || error
-    };
+      return {
+        success: true,
+        message: 'Logged in successfully',
+        token: {
+          accessToken: loginResult.accessToken,
+          refreshToken: loginResult.refreshToken
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Login failed',
+        error: error.message || error
+      };
+    }
   }
-}
 
 
   @Post('refresh')
@@ -146,12 +145,29 @@ async login(
     }
   }
 
+  @Post('forgot-password')
+  async forgotPassword(@Body('email') email: string) {
+    try {
+      const result = await this.authService.requestPasswordReset(email);
+      return sendResponse(HttpStatus.OK, true, result.message);
+    } catch (error) {
+      const status = error.status || HttpStatus.BAD_REQUEST;
+      return sendResponse(status, false, 'Password reset request failed', error.message || error);
+    }
+  }
 
-
-
-
-
-
-
+  @Post('reset-password')
+  async resetPassword(
+    @Body('token') token: string,
+    @Body('newPassword') newPassword: string,
+  ) {
+    try {
+      const result = await this.authService.resetPassword(token, newPassword);
+      return sendResponse(HttpStatus.OK, true, result.message);
+    } catch (error) {
+      const status = error.status || HttpStatus.BAD_REQUEST;
+      return sendResponse(status, false, 'Password reset failed', error.message || error);
+    }
+  }
 
 }

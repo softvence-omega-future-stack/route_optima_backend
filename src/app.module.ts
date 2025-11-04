@@ -12,6 +12,7 @@ import { TechnicianService } from './technician/technician.service';
 import { TechnicianController } from './technician/technician.controller';
 import { TechnicianModule } from './technician/technician.module';
 
+
 @Module({
   imports: [
     ConfigModule.forRoot({
