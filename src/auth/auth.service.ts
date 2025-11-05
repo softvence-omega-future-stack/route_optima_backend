@@ -83,6 +83,17 @@ export class AuthService {
     };
   }
 
+  async getCurrentAdmin(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) throw new UnauthorizedException('Admin not found');
+    if (user.role !== 'ADMIN')
+      throw new UnauthorizedException('Access denied: not an admin');
+
+    return this.excludePassword(user);
+  }
 
   // * refresh token
   async refreshTokens(refreshToken: string) {
@@ -249,11 +260,9 @@ export class AuthService {
     }
   }
 
-
-
   // * generate token
   private async generateTokens(userId: string, email: string, role: string) {
-    const payload = { sub: userId, email, role };
+    const payload = { id: userId, email, role };
 
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: process.env.JWT_SECRET || 'default-access-secret-key',
