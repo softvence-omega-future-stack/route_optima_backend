@@ -308,4 +308,15 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('User not found');
     return this.excludePassword(user);
   }
+
+  async verifyToken(token: string) {
+    try {
+      const payload = this.jwtService.verify(token, {
+        secret: process.env.JWT_SECRET || 'default-access-secret-key',
+      });
+      return payload;
+    } catch {
+      throw new UnauthorizedException('Invalid token');
+    }
+  }
 }
