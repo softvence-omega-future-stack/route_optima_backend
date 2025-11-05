@@ -22,8 +22,6 @@ async function bootstrap() {
 
   // Middleware
   app.use(cookieParser());
-
-  // Enable CORS with environment-based configuration
   app.enableCors({
     origin: process.env.CLIENT_URL || 'http://localhost:3000',
     credentials: true,

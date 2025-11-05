@@ -24,7 +24,7 @@ export class AuthService {
   ) { }
 
   async register(registerDto: RegisterDto) {
-    const { email, password, name } = registerDto;
+    const { email, password, name, photo } = registerDto;
 
     // Check if user already exists
     const existingUser = await this.prisma.user.findUnique({
@@ -45,6 +45,7 @@ export class AuthService {
         password: hashedPassword,
         name,
         role: 'ADMIN',
+        photo: photo || null,
       },
     });
 
@@ -54,6 +55,7 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: user.role,
+        photo: user.photo
       },
     };
   }
@@ -307,5 +309,16 @@ export class AuthService {
     });
     if (!user) throw new UnauthorizedException('User not found');
     return this.excludePassword(user);
+  }
+
+  async verifyToken(token: string) {
+    try {
+      const payload = this.jwtService.verify(token, {
+        secret: process.env.JWT_SECRET || 'default-access-secret-key',
+      });
+      return payload;
+    } catch {
+      throw new UnauthorizedException('Invalid token');
+    }
   }
 }

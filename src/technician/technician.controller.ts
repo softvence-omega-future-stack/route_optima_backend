@@ -44,7 +44,7 @@ export class TechnicianController {
       if (file) {
         technicianData.photo = `/uploads/${file.path}`;
       }
-        console.log(technicianData)
+        // console.log(technicianData)
       return this.technicianService.createTechnician(technicianData);
     } catch (error) {
       console.log(error)

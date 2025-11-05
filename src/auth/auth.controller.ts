@@ -86,23 +86,21 @@ export class AuthController {
     }
   }
 
-@Get('me')
-@UseGuards(AuthGuard, RolesGuard)
-@AuthRoles(UserRole.ADMIN)
-async getCurrentAdmin(@CurrentUser() user) {
-  try {
-    if (!user || !user.id) {
-      throw new UnauthorizedException('User not authenticated');
+  @Get('me')
+  @UseGuards(AuthGuard, RolesGuard)
+  @AuthRoles(UserRole.ADMIN)
+  async getCurrentAdmin(@CurrentUser() user) {
+    try {
+      if (!user || !user.id) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+      const admin = await this.authService.getCurrentAdmin(user.id);
+      return sendResponse(HttpStatus.OK, true, 'Current admin fetched successfully', admin);
+    } catch (error) {
+      const status = error.status || HttpStatus.BAD_REQUEST;
+      return sendResponse(status, false, 'Failed to get current admin', error.message || error);
     }
-    const admin = await this.authService.getCurrentAdmin(user.id);
-    return sendResponse(HttpStatus.OK, true, 'Current admin fetched successfully', admin);
-  } catch (error) {
-    const status = error.status || HttpStatus.BAD_REQUEST;
-    return sendResponse(status, false, 'Failed to get current admin', error.message || error);
   }
-}
-
-
 
   @Post('refresh')
   @HttpCode(200)
@@ -192,6 +190,18 @@ async getCurrentAdmin(@CurrentUser() user) {
     } catch (error) {
       const status = error.status || HttpStatus.BAD_REQUEST;
       return sendResponse(status, false, 'Password reset failed', error.message || error);
+    }
+  }
+
+  @Post('verify-token')
+  @HttpCode(200)
+  async verifyToken(@Body('token') token: string) {
+    try {
+      const payload = await this.authService.verifyToken(token);
+      return sendResponse(HttpStatus.OK, true, 'Token is valid', payload);
+    } catch (error) {
+      const status = error.status || HttpStatus.UNAUTHORIZED;
+      return sendResponse(status, false, 'Token verification failed', error.message || error);
     }
   }
 
