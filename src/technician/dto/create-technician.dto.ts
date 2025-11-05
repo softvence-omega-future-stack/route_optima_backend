@@ -4,7 +4,7 @@ export class CreateTechnicianDto {
   @IsString()
   name: string;
 
-  @IsPhoneNumber('US')
+  @IsPhoneNumber()
   phone: string;
 
   @IsOptional()
