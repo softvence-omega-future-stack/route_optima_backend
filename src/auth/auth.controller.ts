@@ -1,11 +1,14 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
   Req,
   Res,
+  UnauthorizedException,
+  UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
@@ -15,6 +18,11 @@ import { RegisterDto } from './dto/register.dto';
 import { sendResponse } from 'src/lib/responseHandler';
 import { LoginDto } from './dto/login.dto';
 import type { CustomCookiesResponse } from 'src/common/types/cookiesResponse.types';
+import { AuthGuard } from './guards/jwt-auth-guard';
+import { RolesGuard } from './guards/role-guard';
+import { AuthRoles } from 'src/common/decorators/roles.decorator';
+import { CurrentUser } from 'src/common/decorators/currentUser.decorator';
+import { UserRole } from '@prisma/client';
 
 @Controller('api/v1/auth')
 export class AuthController {
@@ -77,6 +85,23 @@ export class AuthController {
       };
     }
   }
+
+@Get('me')
+@UseGuards(AuthGuard, RolesGuard)
+@AuthRoles(UserRole.ADMIN)
+async getCurrentAdmin(@CurrentUser() user) {
+  try {
+    if (!user || !user.id) {
+      throw new UnauthorizedException('User not authenticated');
+    }
+    const admin = await this.authService.getCurrentAdmin(user.id);
+    return sendResponse(HttpStatus.OK, true, 'Current admin fetched successfully', admin);
+  } catch (error) {
+    const status = error.status || HttpStatus.BAD_REQUEST;
+    return sendResponse(status, false, 'Failed to get current admin', error.message || error);
+  }
+}
+
 
 
   @Post('refresh')
