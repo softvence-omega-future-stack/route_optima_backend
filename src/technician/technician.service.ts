@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, ConflictException, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, Injectable, ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { CreateTechnicianDto } from './dto/create-technician.dto';
 import { Prisma } from '@prisma/client';
 import { GetAllTechniciansDto } from './dto/get-all-technicians-dto';
+import { UpdateTechnicianDto } from './dto/update-technician.dto';
 
 @Injectable()
 export class TechnicianService {
@@ -187,6 +188,96 @@ export class TechnicianService {
       // Handle unknown errors
       console.error('Unexpected error in getAllTechnicians:', error);
       throw new InternalServerErrorException('Failed to retrieve technicians');
+    }
+  }
+
+  async updateTechnician(id: string, dto: UpdateTechnicianDto) {
+    try {
+      // Check if technician exists
+      const existingTechnician = await this.prisma.technician.findUnique({
+        where: { id },
+      });
+
+      if (!existingTechnician) {
+        throw new NotFoundException(`Technician with ID ${id} not found`);
+      }
+
+      // Validate work hours if both are provided
+      const startTime = dto.workStartTime || existingTechnician.workStartTime;
+      const endTime = dto.workEndTime || existingTechnician.workEndTime;
+
+      if (startTime && endTime) {
+        this.validateWorkHours(startTime, endTime);
+      }
+
+      // Check if phone number is being updated and if it conflicts with another technician
+      if (dto.phone && dto.phone !== existingTechnician.phone) {
+        const phoneExists = await this.prisma.technician.findFirst({
+          where: { 
+            phone: dto.phone,
+            id: { not: id }, // Exclude current technician
+          },
+        });
+
+        if (phoneExists) {
+          throw new ConflictException('Phone number already in use by another technician');
+        }
+      }
+
+      // Prepare update data - only include fields that are provided
+      const updateData: Prisma.TechnicianUpdateInput = {};
+      
+      if (dto.name !== undefined) updateData.name = dto.name;
+      if (dto.phone !== undefined) updateData.phone = dto.phone;
+      if (dto.region !== undefined) updateData.region = dto.region;
+      if (dto.workStartTime !== undefined) updateData.workStartTime = dto.workStartTime;
+      if (dto.workEndTime !== undefined) updateData.workEndTime = dto.workEndTime;
+      if (dto.photo !== undefined) updateData.photo = dto.photo;
+      if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
+
+      // Update the technician
+      const technician = await this.prisma.technician.update({
+        where: { id },
+        data: updateData,
+      });
+
+      return {
+        message: 'Technician updated successfully',
+        technician,
+      };
+    } catch (error) {
+      // Handle known Prisma errors
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        switch (error.code) {
+          case 'P2002':
+            throw new ConflictException('Phone number already in use');
+          case 'P2025':
+            throw new NotFoundException(`Technician with ID ${id} not found`);
+          case 'P2003':
+            throw new BadRequestException('Invalid reference data provided');
+          default:
+            console.error('Prisma error in updateTechnician:', error);
+            throw new InternalServerErrorException('Database operation failed');
+        }
+      }
+
+      // Handle NestJS HTTP exceptions
+      if (
+        error instanceof BadRequestException ||
+        error instanceof ConflictException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+
+      // Handle validation errors
+      if (error instanceof Prisma.PrismaClientValidationError) {
+        throw new BadRequestException('Invalid data provided');
+      }
+
+      // Handle unknown errors
+      console.error('Unexpected error in updateTechnician:', error);
+      throw new InternalServerErrorException('Failed to update technician');
     }
   }
 

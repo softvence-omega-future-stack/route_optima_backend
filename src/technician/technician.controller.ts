@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, HttpStatus, Post, Query, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpStatus, Param, Patch, Post, Query, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { TechnicianService } from './technician.service';
 import { CreateTechnicianDto } from './dto/create-technician.dto';
 import { sendResponse } from 'src/lib/responseHandler';
@@ -11,6 +11,7 @@ import { RolesGuard } from 'src/auth/guards/role-guard';
 import { AuthRoles } from 'src/common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { GetAllTechniciansDto } from './dto/get-all-technicians-dto';
+import { UpdateTechnicianDto } from './dto/update-technician.dto';
 
 
 @Controller('api/v1/technician')
@@ -92,6 +93,81 @@ export class TechnicianController {
         null,
         null,
         res
+      );
+    }
+  }
+
+   @Patch('update-technician/:id')
+  @UseInterceptors(
+    FileInterceptor('photo', {
+      storage: diskStorage({
+        destination: join(__dirname, '..', '..', 'uploads'),
+        filename: (req, file, cb) => {
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+    }),
+  )
+  @UseGuards(AuthGuard, RolesGuard)
+  @AuthRoles(UserRole.ADMIN)
+  async updateTechnician(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('data') data: string,
+    @Res() res: Response,
+  ) {
+    try {
+      // Parse the JSON string
+      const technicianData: UpdateTechnicianDto = data ? JSON.parse(data) : {};
+
+      // Add the photo path if uploaded
+      if (file) {
+        technicianData.photo = `/uploads/${file.filename}`;
+      }
+
+      const result = await this.technicianService.updateTechnician(id, technicianData);
+      
+      return sendResponse(
+        HttpStatus.OK,
+        true,
+        result.message,
+        result.technician,
+        null,
+        res,
+      );
+    } catch (error) {
+      console.error('Error in updateTechnician:', error);
+
+      if (error instanceof SyntaxError) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          'Invalid JSON data provided',
+          null,
+          null,
+          res,
+        );
+      }
+
+      if (error instanceof BadRequestException) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          error.message,
+          null,
+          null,
+          res,
+        );
+      }
+
+      return sendResponse(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        false,
+        'Failed to update technician',
+        null,
+        null,
+        res,
       );
     }
   }
