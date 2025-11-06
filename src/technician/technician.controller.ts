@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, HttpStatus, Param, Patch, Post, Query, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpStatus, Param, Patch, Post, Query, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { TechnicianService } from './technician.service';
 import { CreateTechnicianDto } from './dto/create-technician.dto';
 import { sendResponse } from 'src/lib/responseHandler';
@@ -46,7 +46,7 @@ export class TechnicianController {
       if (file) {
         technicianData.photo = `/uploads/${file.path}`;
       }
-        // console.log(technicianData)
+      // console.log(technicianData)
       return this.technicianService.createTechnician(technicianData);
     } catch (error) {
       console.log(error)
@@ -66,7 +66,7 @@ export class TechnicianController {
   ) {
     try {
       const result = await this.technicianService.getAllTechnicians(query);
-      
+
       return sendResponse(
         HttpStatus.OK,
         true,
@@ -77,7 +77,7 @@ export class TechnicianController {
       );
     } catch (error) {
       console.error('Error in getAllTechnicians:', error);
-      
+
       if (error instanceof BadRequestException) {
         return sendResponse(
           HttpStatus.BAD_REQUEST,
@@ -106,7 +106,7 @@ export class TechnicianController {
   ) {
     try {
       const result = await this.technicianService.getTechnicianById(id);
-      
+
       return sendResponse(
         HttpStatus.OK,
         true,
@@ -152,7 +152,7 @@ export class TechnicianController {
   }
 
 
-   @Patch('update-technician/:id')
+  @Patch('update-technician/:id')
   @UseInterceptors(
     FileInterceptor('photo', {
       storage: diskStorage({
@@ -182,7 +182,7 @@ export class TechnicianController {
       }
 
       const result = await this.technicianService.updateTechnician(id, technicianData);
-      
+
       return sendResponse(
         HttpStatus.OK,
         true,
@@ -220,6 +220,60 @@ export class TechnicianController {
         HttpStatus.INTERNAL_SERVER_ERROR,
         false,
         'Failed to update technician',
+        null,
+        null,
+        res,
+      );
+    }
+  }
+
+  @Delete('delete-technician/:id')
+  @UseGuards(AuthGuard, RolesGuard)
+  @AuthRoles(UserRole.ADMIN)
+  async deleteTechnician(
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.technicianService.deleteTechnician(id);
+      
+      return sendResponse(
+        HttpStatus.OK,
+        true,
+        result.message,
+        null,
+        null,
+        res,
+      );
+    } catch (error) {
+      console.error('Error in deleteTechnician:', error);
+
+      if (error instanceof BadRequestException) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          error.message,
+          null,
+          null,
+          res,
+        );
+      }
+
+      if (error.status === 404 || error.message.includes('not found')) {
+        return sendResponse(
+          HttpStatus.NOT_FOUND,
+          false,
+          error.message || 'Technician not found',
+          null,
+          null,
+          res,
+        );
+      }
+
+      return sendResponse(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        false,
+        'Failed to delete technician',
         null,
         null,
         res,

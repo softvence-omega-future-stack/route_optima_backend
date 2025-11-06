@@ -4,10 +4,31 @@ import { CreateTechnicianDto } from './dto/create-technician.dto';
 import { Prisma } from '@prisma/client';
 import { GetAllTechniciansDto } from './dto/get-all-technicians-dto';
 import { UpdateTechnicianDto } from './dto/update-technician.dto';
+import { join } from 'path';
+import { existsSync, unlinkSync } from 'fs';
 
 @Injectable()
 export class TechnicianService {
   constructor(private prisma: PrismaService) { }
+
+  private async deletePhotoFile(photoPath: string | null): Promise<void> {
+    if (!photoPath) return;
+
+    try {
+      const filename = photoPath.replace('/uploads/', '');
+      const fullPath = join(__dirname, '..', '..', 'uploads', filename);
+
+      // Check if file exists before attempting to delete
+      if (existsSync(fullPath)) {
+        await unlinkSync(fullPath);
+        console.log(`Deleted photo file: ${fullPath}`);
+      } else {
+        console.log(`Photo file not found: ${fullPath}`);
+      }
+    } catch (error) {
+      console.error(`Failed to delete photo file: ${photoPath}`, error);
+    }
+  }
 
   private validateWorkHours(startTime: string, endTime: string): void {
     const [startHour, startMin] = startTime.split(':').map(Number);
@@ -113,12 +134,12 @@ export class TechnicianService {
           // Search across name, phone, and region (case-insensitive, partial match)
           search
             ? {
-                OR: [
-                  { name: { contains: search, mode: 'insensitive' } },
-                  { phone: { contains: search, mode: 'insensitive' } },
-                  { region: { contains: search, mode: 'insensitive' } },
-                ],
-              }
+              OR: [
+                { name: { contains: search, mode: 'insensitive' } },
+                { phone: { contains: search, mode: 'insensitive' } },
+                { region: { contains: search, mode: 'insensitive' } },
+              ],
+            }
             : {},
           // Filter by region (case-insensitive, partial match)
           region
@@ -275,7 +296,7 @@ export class TechnicianService {
       // Check if phone number is being updated and if it conflicts with another technician
       if (dto.phone && dto.phone !== existingTechnician.phone) {
         const phoneExists = await this.prisma.technician.findFirst({
-          where: { 
+          where: {
             phone: dto.phone,
             id: { not: id }, // Exclude current technician
           },
@@ -288,7 +309,7 @@ export class TechnicianService {
 
       // Prepare update data - only include fields that are provided
       const updateData: Prisma.TechnicianUpdateInput = {};
-      
+
       if (dto.name !== undefined) updateData.name = dto.name;
       if (dto.phone !== undefined) updateData.phone = dto.phone;
       if (dto.region !== undefined) updateData.region = dto.region;
@@ -340,6 +361,75 @@ export class TechnicianService {
       // Handle unknown errors
       console.error('Unexpected error in updateTechnician:', error);
       throw new InternalServerErrorException('Failed to update technician');
+    }
+  }
+
+  async deleteTechnician(id: string) {
+    try {
+      // Validate ID format
+      if (!id || id.trim() === '') {
+        throw new BadRequestException('Invalid technician ID');
+      }
+
+      // First, get the technician to retrieve the photo path
+      const technician = await this.prisma.technician.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          photo: true,
+        },
+      });
+
+      if (!technician) {
+        throw new NotFoundException(`Technician with ID ${id} not found`);
+      }
+
+      // Delete the technician from database
+      await this.prisma.technician.delete({
+        where: { id },
+      });
+
+      // Delete the photo file if it exists
+      if (technician.photo) {
+        await this.deletePhotoFile(technician.photo);
+      }
+
+      return {
+        message: "Technician deleted successfully",
+      };
+    } catch (error) {
+      // Handle known Prisma errors
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        switch (error.code) {
+          case 'P2025':
+            throw new NotFoundException(`Technician with ID ${id} not found`);
+          case 'P2003':
+            throw new BadRequestException(
+              'Cannot delete technician: related records exist. Please remove related data first.',
+            );
+          default:
+            console.error('Prisma error in deleteTechnician:', error);
+            throw new InternalServerErrorException('Database operation failed');
+        }
+      }
+
+      // Handle NestJS HTTP exceptions
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+
+      // Handle validation errors
+      if (error instanceof Prisma.PrismaClientValidationError) {
+        throw new BadRequestException('Invalid technician ID format');
+      }
+
+      // Handle unknown errors
+      console.error('Unexpected error in deleteTechnician:', error);
+      throw new InternalServerErrorException('Failed to delete technician');
     }
   }
 
