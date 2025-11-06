@@ -2,18 +2,19 @@ import { BadRequestException, Injectable, ConflictException, InternalServerError
 import { PrismaService } from 'prisma/prisma.service';
 import { CreateTechnicianDto } from './dto/create-technician.dto';
 import { Prisma } from '@prisma/client';
+import { GetAllTechniciansDto } from './dto/get-all-technicians-dto';
 
 @Injectable()
 export class TechnicianService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
-private validateWorkHours(startTime: string, endTime: string): void {
+  private validateWorkHours(startTime: string, endTime: string): void {
     const [startHour, startMin] = startTime.split(':').map(Number);
     const [endHour, endMin] = endTime.split(':').map(Number);
-    
+
     const startMinutes = startHour * 60 + startMin;
     const endMinutes = endHour * 60 + endMin;
-    
+
     if (endMinutes <= startMinutes) {
       throw new BadRequestException('Work end time must be after start time');
     }
@@ -89,4 +90,105 @@ private validateWorkHours(startTime: string, endTime: string): void {
       throw new InternalServerErrorException('Failed to create technician');
     }
   }
+
+  async getAllTechnicians(dto: GetAllTechniciansDto) {
+    try {
+      const { search, region, isActive, page = 1, limit = 10 } = dto;
+
+      // Validate pagination parameters
+      if (page < 1) {
+        throw new BadRequestException('Page must be greater than 0');
+      }
+      if (limit < 1 || limit > 100) {
+        throw new BadRequestException('Limit must be between 1 and 100');
+      }
+
+      // Calculate pagination
+      const skip = (page - 1) * limit;
+
+      // Build where clause with fuzzy search
+      const whereClause: Prisma.TechnicianWhereInput = {
+        AND: [
+          // Search across name, phone, and region (case-insensitive, partial match)
+          search
+            ? {
+                OR: [
+                  { name: { contains: search, mode: 'insensitive' } },
+                  { phone: { contains: search, mode: 'insensitive' } },
+                  { region: { contains: search, mode: 'insensitive' } },
+                ],
+              }
+            : {},
+          // Filter by region (case-insensitive, partial match)
+          region
+            ? { region: { contains: region, mode: 'insensitive' } }
+            : {},
+          // Filter by active status
+          isActive !== undefined ? { isActive } : {},
+        ],
+      };
+
+      // Execute query with pagination
+      const [technicians, totalCount] = await Promise.all([
+        this.prisma.technician.findMany({
+          where: whereClause,
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            region: true,
+            workStartTime: true,
+            workEndTime: true,
+            photo: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+        this.prisma.technician.count({ where: whereClause }),
+      ]);
+
+      // Calculate pagination metadata
+      const totalPages = Math.ceil(totalCount / limit);
+      const hasNextPage = page < totalPages;
+      const hasPrevPage = page > 1;
+
+      return {
+        technicians,
+        meta: {
+          total: totalCount,
+          page,
+          limit,
+          totalPages,
+          hasNextPage,
+          hasPrevPage,
+        },
+      };
+    } catch (error) {
+      // Handle known Prisma errors
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        console.error('Prisma error in getAllTechnicians:', error);
+        throw new InternalServerErrorException('Database query failed');
+      }
+
+      // Handle NestJS HTTP exceptions
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      // Handle validation errors
+      if (error instanceof Prisma.PrismaClientValidationError) {
+        throw new BadRequestException('Invalid query parameters');
+      }
+
+      // Handle unknown errors
+      console.error('Unexpected error in getAllTechnicians:', error);
+      throw new InternalServerErrorException('Failed to retrieve technicians');
+    }
+  }
+
+
 }

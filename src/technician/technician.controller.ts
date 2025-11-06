@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, HttpStatus, Post, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpStatus, Post, Query, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { TechnicianService } from './technician.service';
 import { CreateTechnicianDto } from './dto/create-technician.dto';
 import { sendResponse } from 'src/lib/responseHandler';
@@ -10,6 +10,7 @@ import { AuthGuard } from 'src/auth/guards/jwt-auth-guard';
 import { RolesGuard } from 'src/auth/guards/role-guard';
 import { AuthRoles } from 'src/common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
+import { GetAllTechniciansDto } from './dto/get-all-technicians-dto';
 
 
 @Controller('api/v1/technician')
@@ -52,6 +53,46 @@ export class TechnicianController {
         throw new BadRequestException('Invalid JSON data provided');
       }
       throw error;
+    }
+  }
+
+  @Get('all-technicians')
+  @UseGuards(AuthGuard, RolesGuard)
+  @AuthRoles(UserRole.ADMIN)
+  async getAllTechnicians(
+    @Query() query: GetAllTechniciansDto,
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.technicianService.getAllTechnicians(query);
+      
+      return sendResponse(
+        HttpStatus.OK,
+        true,
+        'Technicians retrieved successfully',
+        result.technicians,
+        result.meta,
+        res
+      );
+    } catch (error) {
+      console.error('Error in getAllTechnicians:', error);
+      
+      if (error instanceof BadRequestException) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          error.message,
+        );
+      }
+
+      return sendResponse(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        false,
+        'Failed to retrieve technicians',
+        null,
+        null,
+        res
+      );
     }
   }
 }
