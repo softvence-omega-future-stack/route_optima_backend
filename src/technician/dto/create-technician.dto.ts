@@ -9,7 +9,7 @@ export class CreateTechnicianDto {
 
   @IsOptional()
   @IsString()
-  region?: string;
+  address?: string;
 
   @IsString()
   @IsOptional()

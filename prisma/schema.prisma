@@ -67,14 +67,14 @@ model PasswordResetToken {
 
 // Model for managing field technicians
 model Technician {
-  id            String    @id @default(uuid())
+  id            String  @id @default(uuid())
   name          String
-  phone         String    @unique
-  region        String?
+  phone         String  @unique
+  address       String?
   photo         String?
   workStartTime String?
   workEndTime   String?
-  isActive      Boolean   @default(true)
+  isActive      Boolean @default(true)
 
   user User?
 

@@ -65,7 +65,7 @@ export class TechnicianService {
         data: {
           name: dto.name,
           phone: dto.phone,
-          region: dto.region,
+          address: dto.address,
           workStartTime: dto.workStartTime || null,
           workEndTime: dto.workEndTime || null,
           isActive: dto.isActive ?? true,
@@ -115,7 +115,7 @@ export class TechnicianService {
 
   async getAllTechnicians(dto: GetAllTechniciansDto) {
     try {
-      const { search, region, isActive, page = 1, limit = 10 } = dto;
+      const { search, address, isActive, page = 1, limit = 10 } = dto;
 
       // Validate pagination parameters
       if (page < 1) {
@@ -131,19 +131,19 @@ export class TechnicianService {
       // Build where clause with fuzzy search
       const whereClause: Prisma.TechnicianWhereInput = {
         AND: [
-          // Search across name, phone, and region (case-insensitive, partial match)
+          // Search across name, phone, and address (case-insensitive, partial match)
           search
             ? {
               OR: [
                 { name: { contains: search, mode: 'insensitive' } },
                 { phone: { contains: search, mode: 'insensitive' } },
-                { region: { contains: search, mode: 'insensitive' } },
+                { address: { contains: search, mode: 'insensitive' } },
               ],
             }
             : {},
-          // Filter by region (case-insensitive, partial match)
-          region
-            ? { region: { contains: region, mode: 'insensitive' } }
+          // Filter by address (case-insensitive, partial match)
+          address
+            ? { address: { contains: address, mode: 'insensitive' } }
             : {},
           // Filter by active status
           isActive !== undefined ? { isActive } : {},
@@ -161,7 +161,7 @@ export class TechnicianService {
             id: true,
             name: true,
             phone: true,
-            region: true,
+            address: true,
             workStartTime: true,
             workEndTime: true,
             photo: true,
@@ -225,7 +225,7 @@ export class TechnicianService {
           id: true,
           name: true,
           phone: true,
-          region: true,
+          address: true,
           workStartTime: true,
           workEndTime: true,
           photo: true,
@@ -312,7 +312,7 @@ export class TechnicianService {
 
       if (dto.name !== undefined) updateData.name = dto.name;
       if (dto.phone !== undefined) updateData.phone = dto.phone;
-      if (dto.region !== undefined) updateData.region = dto.region;
+      if (dto.address !== undefined) updateData.address = dto.address;
       if (dto.workStartTime !== undefined) updateData.workStartTime = dto.workStartTime;
       if (dto.workEndTime !== undefined) updateData.workEndTime = dto.workEndTime;
       if (dto.photo !== undefined) updateData.photo = dto.photo;

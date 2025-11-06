@@ -8,7 +8,7 @@ export class GetAllTechniciansDto {
 
     @IsOptional()
     @IsString()
-    region?: string;
+    address?: string;
 
     @IsOptional()
     @IsBoolean()

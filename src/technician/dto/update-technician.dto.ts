@@ -11,7 +11,7 @@ export class UpdateTechnicianDto {
 
   @IsOptional()
   @IsString()
-  region?: string;
+  address?: string;
 
   @IsOptional()
   @IsDateString()
