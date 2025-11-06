@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import * as dotenv from 'dotenv';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { ValidationPipe } from '@nestjs/common';
 
 // Load .env only in development
 if (process.env.NODE_ENV !== 'production') {
@@ -26,6 +27,18 @@ async function bootstrap() {
     origin: process.env.CLIENT_URL || 'http://localhost:3000',
     credentials: true,
   });
+
+  // Global validation pipe - CRITICAL for DTO validation and transformation
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true, 
+      forbidNonWhitelisted: false, 
+      transformOptions: {
+        enableImplicitConversion: false, 
+      },
+    }),
+  );
 
   // Use the PORT from .env or fallback to 3000
   const port = process.env.PORT || 3000;
