@@ -97,6 +97,61 @@ export class TechnicianController {
     }
   }
 
+  @Get('single/:id')
+  @UseGuards(AuthGuard, RolesGuard)
+  @AuthRoles(UserRole.ADMIN)
+  async getTechnicianById(
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.technicianService.getTechnicianById(id);
+      
+      return sendResponse(
+        HttpStatus.OK,
+        true,
+        'Technician retrieved successfully',
+        result.technician,
+        null,
+        res,
+      );
+    } catch (error) {
+      console.error('Error in getTechnicianById:', error);
+
+      if (error instanceof BadRequestException) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          error.message,
+          null,
+          null,
+          res,
+        );
+      }
+
+      if (error.status === 404 || error.message.includes('not found')) {
+        return sendResponse(
+          HttpStatus.NOT_FOUND,
+          false,
+          error.message || 'Technician not found',
+          null,
+          null,
+          res,
+        );
+      }
+
+      return sendResponse(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        false,
+        'Failed to retrieve technician',
+        null,
+        null,
+        res,
+      );
+    }
+  }
+
+
    @Patch('update-technician/:id')
   @UseInterceptors(
     FileInterceptor('photo', {

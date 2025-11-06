@@ -191,6 +191,68 @@ export class TechnicianService {
     }
   }
 
+  async getTechnicianById(id: string) {
+    try {
+      // Validate ID format (optional, but good practice)
+      if (!id || id.trim() === '') {
+        throw new BadRequestException('Invalid technician ID');
+      }
+
+      const technician = await this.prisma.technician.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          region: true,
+          workStartTime: true,
+          workEndTime: true,
+          photo: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      if (!technician) {
+        throw new NotFoundException(`Technician with ID ${id} not found`);
+      }
+
+      return {
+        message: 'Technician retrieved successfully',
+        technician,
+      };
+    } catch (error) {
+      // Handle known Prisma errors
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        switch (error.code) {
+          case 'P2025':
+            throw new NotFoundException(`Technician with ID ${id} not found`);
+          default:
+            console.error('Prisma error in getTechnicianById:', error);
+            throw new InternalServerErrorException('Database query failed');
+        }
+      }
+
+      // Handle NestJS HTTP exceptions
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+
+      // Handle validation errors
+      if (error instanceof Prisma.PrismaClientValidationError) {
+        throw new BadRequestException('Invalid technician ID format');
+      }
+
+      // Handle unknown errors
+      console.error('Unexpected error in getTechnicianById:', error);
+      throw new InternalServerErrorException('Failed to retrieve technician');
+    }
+  }
+
   async updateTechnician(id: string, dto: UpdateTechnicianDto) {
     try {
       // Check if technician exists
