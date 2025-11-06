@@ -7,8 +7,27 @@ import { Prisma } from '@prisma/client';
 export class TechnicianService {
   constructor(private prisma: PrismaService) {}
 
+private validateWorkHours(startTime: string, endTime: string): void {
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const [endHour, endMin] = endTime.split(':').map(Number);
+    
+    const startMinutes = startHour * 60 + startMin;
+    const endMinutes = endHour * 60 + endMin;
+    
+    if (endMinutes <= startMinutes) {
+      throw new BadRequestException('Work end time must be after start time');
+    }
+  }
+
+
   async createTechnician(dto: CreateTechnicianDto) {
     try {
+
+      // Validate work hours if both are provided
+      if (dto.workStartTime && dto.workEndTime) {
+        this.validateWorkHours(dto.workStartTime, dto.workEndTime);
+      }
+
       // Optional: check if technician already exists by phone number
       if (dto.phone) {
         const existing = await this.prisma.technician.findFirst({
@@ -24,8 +43,8 @@ export class TechnicianService {
           name: dto.name,
           phone: dto.phone,
           region: dto.region,
-          workStartTime: dto.workStartTime ? new Date(dto.workStartTime) : null,
-          workEndTime: dto.workEndTime ? new Date(dto.workEndTime) : null,
+          workStartTime: dto.workStartTime || null,
+          workEndTime: dto.workEndTime || null,
           isActive: dto.isActive ?? true,
           photo: dto.photo,
         },

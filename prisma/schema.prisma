@@ -72,8 +72,8 @@ model Technician {
   phone         String    @unique
   region        String?
   photo         String?
-  workStartTime DateTime?
-  workEndTime   DateTime?
+  workStartTime String?
+  workEndTime   String?
   isActive      Boolean   @default(true)
 
   user User?
