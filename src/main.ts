@@ -23,8 +23,10 @@ async function bootstrap() {
   // Middleware
   app.use(cookieParser());
   app.enableCors({
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
-    credentials: true,
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    credentials: false, 
   });
 
   // Use the PORT from .env or fallback to 3000
