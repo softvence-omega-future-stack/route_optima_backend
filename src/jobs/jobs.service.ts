@@ -3,20 +3,20 @@ import { ConfigService } from '@nestjs/config';
 import { sendResponse } from 'src/lib/responseHandler';
 import { CreateJobDto } from './dto/create-job.dto';
 import { PrismaService } from 'prisma/prisma.service';
+import { GeocoderUtil } from 'src/utils/geocoder.util';
 
 
 @Injectable()
 export class JobsService {
+  private readonly logger = new Logger(JobsService.name);
 
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService, private geocoderUtil: GeocoderUtil,) { }
 
   async createJob(createJobDto: CreateJobDto) {
     try {
 
 
-      console.log('Received createJobDto:', createJobDto);
-      console.log('Technician ID:', createJobDto.technicianId);
-      console.log('TimeSlot ID:', createJobDto.timeSlotId);
+      this.logger.log('Creating new job...');
 
       // Verify technician exists
       if (!createJobDto.technicianId) {
@@ -24,6 +24,15 @@ export class JobsService {
           HttpStatus.BAD_REQUEST,
           false,
           'Technician ID is required',
+          null
+        );
+      }
+
+      if (!createJobDto.timeSlotId) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          'Time slot ID is required',
           null
         );
       }
@@ -57,6 +66,27 @@ export class JobsService {
         );
       }
 
+      // Geocode the service address if lat/lng not provided
+      let latitude = createJobDto.latitude;
+      let longitude = createJobDto.longitude;
+
+      if (!latitude || !longitude) {
+        this.logger.log(`Geocoding address: ${createJobDto.serviceAddress}`);
+        const geocodeResult = await this.geocoderUtil.geocodeAddress(
+          createJobDto.serviceAddress
+        );
+
+        if (geocodeResult) {
+          latitude = geocodeResult.latitude;
+          longitude = geocodeResult.longitude;
+          this.logger.log(`Geocoding successful - Lat: ${latitude}, Lng: ${longitude}`);
+        } else {
+          this.logger.warn(`Geocoding failed for address: ${createJobDto.serviceAddress}`);
+          // Continue without coordinates - don't fail the job creation
+        }
+      }
+
+
       // Create the job
       const job = await this.prisma.job.create({
         data: {
@@ -76,8 +106,8 @@ export class JobsService {
           technicianId: createJobDto.technicianId,
 
           // Optional geolocation
-          latitude: createJobDto.latitude,
-          longitude: createJobDto.longitude,
+          latitude: latitude,
+          longitude: longitude,
         },
         include: {
           timeSlot: true,
