@@ -79,37 +79,19 @@ model Technician {
   user User?
 
   jobs      Job[]
-  slots     TimeSlot[]
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-}
-
-model TimeSlot {
-  id        String   @id @default(uuid())
-  label     String
-  startTime DateTime
-  endTime   DateTime
-  date      DateTime
-
-  technicianId String
-  technician   Technician @relation(fields: [technicianId], references: [id])
-
-  isBooked Boolean @default(false)
-
-  jobs Job[]
-
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
-
-// Add this new model to your schema
 
 model DefaultTimeSlot {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   label     String
-  startTime String   // Format: "08:00" (24-hour format)
-  endTime   String   // Format: "10:00" (24-hour format)
-  order     Int      @default(autoincrement())
-  isActive  Boolean  @default(true)
+  startTime String // Format: "08:00" (24-hour format)
+  endTime   String // Format: "10:00" (24-hour format)
+  order     Int     @default(autoincrement())
+  isActive  Boolean @default(true)
+  jobs      Job[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -119,28 +101,34 @@ model DefaultTimeSlot {
 // Model for a scheduled job or appointment
 model Job {
   id             String  @id @default(uuid())
+  // Customer Information
   customerName   String
-  customerPhone  String?
+  customerPhone  String
   customerEmail  String?
-  jobDescription String?
-
-  // Location details
   serviceAddress String
   zipCode        String?
+  latitude       Float?
+  longitude      Float?
 
-  latitude  Float?
-  longitude Float?
-  state     String?
+  // Job Details
+  jobDescription String
 
-  // Scheduling and assignment
-  scheduledDate DateTime
-  timeSlotId    String
-  timeSlot      TimeSlot @relation(fields: [timeSlotId], references: [id])
+  // Schedule Information (already in Job - perfect!)
+  scheduledDate DateTime // Date from form
+  timeSlotId    String // Selected time slot ID
+  timeSlot      DefaultTimeSlot @relation(fields: [timeSlotId], references: [id])
+  technicianId  String
+  technician    Technician      @relation(fields: [technicianId], references: [id])
 
-  technicianId String
-  technician   Technician @relation(fields: [technicianId], references: [id])
+  status    JobStatus @default(ASSIGNED)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
 
-  status JobStatus @default(PENDING)
+model NotificationPreferences {
+  id                String  @id @default("singleton")
+  sendCustomerEmail Boolean @default(true)
+  sendTechnicianSMS Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
