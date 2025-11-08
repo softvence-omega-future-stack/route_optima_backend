@@ -11,6 +11,7 @@ import { JobsModule } from './jobs/jobs.module';
 import { TechnicianService } from './technician/technician.service';
 import { TechnicianController } from './technician/technician.controller';
 import { TechnicianModule } from './technician/technician.module';
+import { DefaultTimeSlotModule } from './default-time-slot/default-time-slot.module';
 
 
 @Module({
@@ -23,6 +24,7 @@ import { TechnicianModule } from './technician/technician.module';
     UsersModule,
     JobsModule,
     TechnicianModule,
+    DefaultTimeSlotModule,
   ],
   controllers: [AppController],
   providers: [AppService],

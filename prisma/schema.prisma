@@ -101,6 +101,21 @@ model TimeSlot {
   createdAt DateTime @default(now())
 }
 
+// Add this new model to your schema
+
+model DefaultTimeSlot {
+  id        String   @id @default(uuid())
+  label     String
+  startTime String   // Format: "08:00" (24-hour format)
+  endTime   String   // Format: "10:00" (24-hour format)
+  order     Int      @default(autoincrement())
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, order])
+}
+
 // Model for a scheduled job or appointment
 model Job {
   id             String  @id @default(uuid())
