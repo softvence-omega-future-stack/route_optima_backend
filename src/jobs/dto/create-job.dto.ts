@@ -1,20 +1,17 @@
-import { IsString, IsEmail, IsOptional, IsDateString } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsDate, IsNumber } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateJobDto {
+  // Customer Information
   @IsString()
   customerName: string;
 
-  @IsOptional()
   @IsString()
-  customerPhone?: string;
+  customerPhone: string;
 
   @IsOptional()
   @IsEmail()
   customerEmail?: string;
-
-  @IsOptional()
-  @IsString()
-  jobDescription?: string;
 
   @IsString()
   serviceAddress: string;
@@ -22,13 +19,28 @@ export class CreateJobDto {
   @IsOptional()
   @IsString()
   zipCode?: string;
-
-  @IsDateString()
-  scheduledDate: string;
+  
+  // Job Details
+  @IsString()
+  jobDescription: string;
+  
+  // Schedule Information
+  @IsDate()
+  @Type(() => Date)
+  scheduledDate: Date;
 
   @IsString()
   timeSlotId: string;
 
   @IsString()
   technicianId: string;
+  
+  // Optional geolocation
+  @IsOptional()
+  @IsNumber()
+  latitude?: number;
+
+  @IsOptional()
+  @IsNumber()
+  longitude?: number;
 }

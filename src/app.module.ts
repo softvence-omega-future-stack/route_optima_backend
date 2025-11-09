@@ -3,14 +3,12 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
-import { PrismaModule } from 'prisma/prisma.module';
+import { PrismaModule } from '../prisma/prisma.module';
 import { UsersModule } from './users/users.module';
-import { JobsService } from './jobs/jobs.service';
-import { JobsController } from './jobs/jobs.controller';
 import { JobsModule } from './jobs/jobs.module';
-import { TechnicianService } from './technician/technician.service';
-import { TechnicianController } from './technician/technician.controller';
 import { TechnicianModule } from './technician/technician.module';
+import { DefaultTimeSlotModule } from './default-time-slot/default-time-slot.module';
+
 
 
 @Module({
@@ -23,6 +21,7 @@ import { TechnicianModule } from './technician/technician.module';
     UsersModule,
     JobsModule,
     TechnicianModule,
+    DefaultTimeSlotModule,
   ],
   controllers: [AppController],
   providers: [AppService],
