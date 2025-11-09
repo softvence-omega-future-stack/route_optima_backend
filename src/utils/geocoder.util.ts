@@ -18,21 +18,25 @@ export class GeocoderUtil {
   private readonly logger = new Logger(GeocoderUtil.name);
 
   constructor(private configService: ConfigService) {
-    const apiKey = this.configService.get<string>('GOOGLE_MAPS_API_KEY');
+    const apiKey = this.configService.get<string>('GEO_CODING_API_KEY');
     
     if (!apiKey) {
-      this.logger.warn('GOOGLE_MAPS_API_KEY is not set in environment variables');
+      this.logger.warn('GEO_CODING_API_KEY is not set in environment variables');
     }
 
-    const options: NodeGeocoderOptions = {
-      provider: 'google',
-      apiKey: apiKey,
-      // Optional: specify language and region
-      language: 'en',
-      region: 'us',
-    } as NodeGeocoderOptions;
+    try {
+      const options = {
+        provider: 'google' as const,
+        apiKey: apiKey,
+        language: 'en',
+        region: 'us',
+      };
 
-    this.geocoder = NodeGeocoder(options);
+      this.geocoder = NodeGeocoder(options);
+      this.logger.log('Geocoder initialized successfully with GEO_CODING_API_KEY');
+    } catch (error) {
+      this.logger.error('Failed to initialize geocoder:', error);
+    }
   }
 
   async geocodeAddress(address: string): Promise<GeocodeResult | null> {
