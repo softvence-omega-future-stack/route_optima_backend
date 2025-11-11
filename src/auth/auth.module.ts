@@ -11,7 +11,7 @@ import { MailService } from 'src/mail/mail.service';
     PrismaModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'default-access-secret-key',
-      signOptions: { expiresIn: '15m' },
+      signOptions: { expiresIn: '60m' },
     }),
   ],
   controllers: [AuthController],
