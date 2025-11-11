@@ -118,7 +118,7 @@ model Job {
   timeSlotId    String // Selected time slot ID
   timeSlot      DefaultTimeSlot @relation(fields: [timeSlotId], references: [id])
   technicianId  String
-  technician    Technician      @relation(fields: [technicianId], references: [id])
+  technician    Technician      @relation(fields: [technicianId], references: [id], onDelete: Cascade)
 
   status    JobStatus @default(ASSIGNED)
   createdAt DateTime  @default(now())
