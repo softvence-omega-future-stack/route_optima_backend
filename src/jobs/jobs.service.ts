@@ -9,6 +9,7 @@ import { AddressParserUtil } from 'src/utils/address-parser.util';
 import { UpdateJobDto } from './dto/update-job.dto';
 import { GetStatsDto } from './dto/get-stats.dto';
 import { JobStatus } from '@prisma/client';
+import { NotificationPreferencesService } from 'src/notification-preferences/notification-preferences.service';
 
 @Injectable()
 export class JobsService {
@@ -19,6 +20,7 @@ export class JobsService {
     private geocoderUtil: GeocoderUtil,
     private twilioUtil: TwilioUtil,
     private addressParser: AddressParserUtil,
+    private notificationPreferencesService: NotificationPreferencesService,
   ) {}
 
   async createJob(createJobDto: CreateJobDto) {
@@ -137,16 +139,15 @@ export class JobsService {
       });
 
       // Check notification preferences
+      // Check notification preferences using the service
       const notificationPref =
-        await this.prisma.notificationPreferences.findUnique({
-          where: { id: 'singleton' },
-        });
+        await this.notificationPreferencesService.getPreferences();
 
       this.logger.debug(
         `Notification preferences: ${JSON.stringify(notificationPref)}`,
       );
 
-      if (notificationPref?.sendTechnicianSMS) {
+      if (notificationPref.sendTechnicianSMS) {
         const technicianPhone = job.technician.phone;
         const message = `New job assigned: ${job.jobDescription}. Scheduled for ${job.scheduledDate.toLocaleString()} at ${job.serviceAddress}.`;
 

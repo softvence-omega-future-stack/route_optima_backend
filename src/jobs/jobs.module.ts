@@ -7,11 +7,19 @@ import { GeocoderUtil } from 'src/utils/geocoder.util';
 import { TwilioUtil } from 'src/utils/twilio.util';
 import { NotificationPreferencesSeeder } from './seed/notification-preferences.seeder';
 import { AddressParserUtil } from 'src/utils/address-parser.util';
+import { NotificationPreferencesModule } from 'src/notification-preferences/notification-preferences.module';
 
 @Module({
-  imports: [ConfigModule.forRoot()],
+  imports: [ConfigModule.forRoot(), NotificationPreferencesModule],
   controllers: [JobsController],
-  providers: [JobsService, PrismaService, GeocoderUtil, TwilioUtil, NotificationPreferencesSeeder, AddressParserUtil],
+  providers: [
+    JobsService,
+    PrismaService,
+    GeocoderUtil,
+    TwilioUtil,
+    NotificationPreferencesSeeder,
+    AddressParserUtil,
+  ],
   exports: [JobsService],
 })
-export class JobsModule { }
+export class JobsModule {}
