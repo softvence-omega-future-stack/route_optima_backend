@@ -16,17 +16,49 @@ export class GetJobsDto {
 
   @IsOptional()
   @IsString()
-  search?: string;
+  state?: string;
+
+  @IsOptional()
+  @IsString()
+  zipCode?: string;
+
+  @IsOptional()
+  @IsString()
+  customerName?: string;
+
+  @IsOptional()
+  @IsString()
+  customerPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  serviceAddress?: string;
+
+  @IsOptional()
+  @IsString()
+  technicianId?: string;
+
+  @IsOptional()
+  @IsString()
+  technicianName?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string; // General search across multiple fields
 
   @IsOptional()
   @IsDateString()
   date?: string;
 
   @IsOptional()
+  @IsDateString()
+  scheduledDate?: string;
+
+  @IsOptional()
   @IsEnum(JobStatus)
   status?: JobStatus;
 
- @IsOptional()
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)

@@ -7,6 +7,8 @@ import { TwilioUtil } from 'src/utils/twilio.util';
 import { GetJobsDto } from './dto/get-jobs.dto';
 import { AddressParserUtil } from 'src/utils/address-parser.util';
 import { UpdateJobDto } from './dto/update-job.dto';
+import { GetStatsDto } from './dto/get-stats.dto';
+import { JobStatus } from '@prisma/client';
 
 @Injectable()
 export class JobsService {
@@ -174,7 +176,22 @@ export class JobsService {
     try {
       this.logger.log('Fetching jobs...');
 
-      const { city, search, date, status, page = 1, limit = 10 } = getJobsDto;
+      const {
+        city,
+        state,
+        zipCode,
+        customerName,
+        customerPhone,
+        serviceAddress,
+        technicianId,
+        technicianName,
+        search,
+        date,
+        scheduledDate,
+        status,
+        page = 1,
+        limit = 10,
+      } = getJobsDto;
 
       // Calculate skip for pagination
       const skip = (page - 1) * limit;
@@ -187,6 +204,55 @@ export class JobsService {
         where.city = {
           contains: city,
           mode: 'insensitive',
+        };
+      }
+
+      // Filter by status
+      if (state) {
+        where.OR = [
+          { state: { contains: state, mode: 'insensitive' } },
+          { stateCode: { contains: state, mode: 'insensitive' } },
+        ];
+      }
+
+      if (zipCode) {
+        where.zipCode = {
+          contains: zipCode,
+          mode: 'insensitive',
+        };
+      }
+
+      if (customerName) {
+        where.customerName = {
+          contains: customerName,
+          mode: 'insensitive',
+        };
+      }
+
+      if (customerPhone) {
+        where.customerPhone = {
+          contains: customerPhone,
+          mode: 'insensitive',
+        };
+      }
+
+      if (serviceAddress) {
+        where.serviceAddress = {
+          contains: serviceAddress,
+          mode: 'insensitive',
+        };
+      }
+
+      if (technicianId) {
+        where.technicianId = technicianId;
+      }
+
+      if (technicianName) {
+        where.technician = {
+          name: {
+            contains: technicianName,
+            mode: 'insensitive',
+          },
         };
       }
 
@@ -207,17 +273,36 @@ export class JobsService {
         };
       }
 
+      // Filter by scheduledDate
+      if (scheduledDate) {
+        const startScheduledDate = new Date(scheduledDate);
+        const endScheduledDate = new Date(scheduledDate);
+        endScheduledDate.setDate(endScheduledDate.getDate() + 1);
+
+        where.scheduledDate = {
+          gte: startScheduledDate,
+          lt: endScheduledDate,
+        };
+      }
+
       // General search across multiple fields
-      if (search) {
+      if (search && !customerName && !customerPhone && !serviceAddress) {
         where.OR = [
           { customerName: { contains: search, mode: 'insensitive' } },
           { customerPhone: { contains: search, mode: 'insensitive' } },
           { customerEmail: { contains: search, mode: 'insensitive' } },
           { serviceAddress: { contains: search, mode: 'insensitive' } },
           { jobDescription: { contains: search, mode: 'insensitive' } },
+          { street: { contains: search, mode: 'insensitive' } },
           { city: { contains: search, mode: 'insensitive' } },
           { state: { contains: search, mode: 'insensitive' } },
+          { stateCode: { contains: search, mode: 'insensitive' } },
           { zipCode: { contains: search, mode: 'insensitive' } },
+          {
+            technician: {
+              name: { contains: search, mode: 'insensitive' },
+            },
+          },
         ];
       }
 
@@ -237,6 +322,8 @@ export class JobsService {
               name: true,
               phone: true,
               photo: true,
+              address: true,
+              isActive: true,
             },
           },
         },
@@ -274,6 +361,43 @@ export class JobsService {
         HttpStatus.INTERNAL_SERVER_ERROR,
         false,
         'Failed to fetch jobs',
+        null,
+      );
+    }
+  }
+
+  async getJobById(id: string) {
+    try {
+      const job = await this.prisma.job.findUnique({
+        where: { id },
+        include: {
+          timeSlot: true,
+          technician: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              photo: true,
+              address: true,
+              workStartTime: true,
+              workEndTime: true,
+              isActive: true,
+            },
+          },
+        },
+      });
+
+      if (!job) {
+        return sendResponse(HttpStatus.NOT_FOUND, false, 'Job not found', null);
+      }
+
+      return sendResponse(HttpStatus.OK, true, 'Job fetched successfully', job);
+    } catch (error) {
+      this.logger.error('Error fetching job:', error);
+      return sendResponse(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        false,
+        'Failed to fetch job',
         null,
       );
     }
@@ -358,6 +482,122 @@ export class JobsService {
         HttpStatus.INTERNAL_SERVER_ERROR,
         false,
         'Failed to update job',
+        null,
+      );
+    }
+  }
+
+  async getJobStats(getStatsDto: GetStatsDto) {
+    try {
+      const { startDate, endDate } = getStatsDto;
+
+      // Build date filter if provided
+      const dateFilter: any = {};
+      if (startDate || endDate) {
+        dateFilter.createdAt = {};
+        if (startDate) dateFilter.createdAt.gte = new Date(startDate);
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setDate(end.getDate() + 1);
+          dateFilter.createdAt.lt = end;
+        }
+      }
+
+      // Get current week range
+      const currentWeekStart = new Date();
+      currentWeekStart.setHours(0, 0, 0, 0);
+      currentWeekStart.setDate(
+        currentWeekStart.getDate() - currentWeekStart.getDay(),
+      ); // Start of week (Sunday)
+
+      const currentWeekEnd = new Date(currentWeekStart);
+      currentWeekEnd.setDate(currentWeekEnd.getDate() + 7); // End of week (Next Sunday)
+
+      // Execute all counts in parallel
+      const [
+        totalJobs,
+        pendingJobs,
+        assignedJobs,
+        completedJobs,
+        totalTechnicians,
+        activeTechnicians,
+        assignedThisWeek, // NEW: Assigned jobs in current week
+      ] = await Promise.all([
+        // Total jobs
+        this.prisma.job.count({ where: dateFilter }),
+
+        // Pending jobs
+        this.prisma.job.count({
+          where: { ...dateFilter, status: JobStatus.PENDING },
+        }),
+
+        // Assigned jobs
+        this.prisma.job.count({
+          where: { ...dateFilter, status: JobStatus.ASSIGNED },
+        }),
+
+        // Completed jobs
+        this.prisma.job.count({
+          where: { ...dateFilter, status: JobStatus.COMPLETED },
+        }),
+
+        // Total technicians
+        this.prisma.technician.count(),
+
+        // Active technicians
+        this.prisma.technician.count({ where: { isActive: true } }),
+
+        // NEW: Assigned jobs this week
+        this.prisma.job.count({
+          where: {
+            status: JobStatus.ASSIGNED,
+            createdAt: {
+              gte: currentWeekStart,
+              lt: currentWeekEnd,
+            },
+          },
+        }),
+      ]);
+
+      // Calculate rates
+      const assignedAndCompletedJobs = assignedJobs + completedJobs;
+
+      const completionRate =
+        totalJobs > 0
+          ? Number(((completedJobs / totalJobs) * 100).toFixed(2))
+          : 0;
+
+      const efficiency =
+        assignedAndCompletedJobs > 0
+          ? Number(
+              ((completedJobs / assignedAndCompletedJobs) * 100).toFixed(2),
+            )
+          : 0;
+
+      const stats = {
+        totalJobs,
+        pendingJobs,
+        assignedJobs,
+        completedJobs,
+        totalTechnicians,
+        activeTechnicians,
+        assignedThisWeek, // NEW FIELD
+        completionRate,
+        efficiency,
+      };
+
+      return sendResponse(
+        HttpStatus.OK,
+        true,
+        'Statistics fetched successfully',
+        stats,
+      );
+    } catch (error) {
+      this.logger.error('Error fetching statistics:', error);
+      return sendResponse(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        false,
+        'Failed to fetch statistics',
         null,
       );
     }

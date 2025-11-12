@@ -13,6 +13,7 @@ import { CreateJobDto } from './dto/create-job.dto';
 import { JobsService } from './jobs.service';
 import { GetJobsDto } from './dto/get-jobs.dto';
 import { UpdateJobDto } from './dto/update-job.dto';
+import { GetStatsDto } from './dto/get-stats.dto';
 
 @Controller('api/v1/jobs')
 export class JobsController {
@@ -31,10 +32,23 @@ export class JobsController {
     return this.jobsService.getAllJobs(getJobsDto);
   }
 
+  @Get('single/:id')
+  @HttpCode(200)
+  async getJobById(@Param('id') id: string) {
+    return this.jobsService.getJobById(id);
+  }
+
   // update job (status update included)
   @Patch('update/:id')
   @HttpCode(200)
   async updateJob(@Param('id') id: string, @Body() updateJobDto: UpdateJobDto) {
     return this.jobsService.updateJob(id, updateJobDto);
+  }
+
+  // job statistics
+  @Get('stats')
+  @HttpCode(200)
+  async getJobStats(@Query() getStatsDto: GetStatsDto) {
+    return this.jobsService.getJobStats(getStatsDto);
   }
 }
