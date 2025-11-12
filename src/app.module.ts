@@ -8,8 +8,7 @@ import { UsersModule } from './users/users.module';
 import { JobsModule } from './jobs/jobs.module';
 import { TechnicianModule } from './technician/technician.module';
 import { DefaultTimeSlotModule } from './default-time-slot/default-time-slot.module';
-
-
+import { NotificationPreferencesModule } from './notification-preferences/notification-preferences.module';
 
 @Module({
   imports: [
@@ -22,6 +21,7 @@ import { DefaultTimeSlotModule } from './default-time-slot/default-time-slot.mod
     JobsModule,
     TechnicianModule,
     DefaultTimeSlotModule,
+    NotificationPreferencesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
