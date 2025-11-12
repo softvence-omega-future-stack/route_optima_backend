@@ -1,12 +1,12 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { sendResponse } from 'src/lib/responseHandler';
 import { CreateJobDto } from './dto/create-job.dto';
 import { PrismaService } from 'prisma/prisma.service';
 import { GeocoderUtil } from 'src/utils/geocoder.util';
 import { TwilioUtil } from 'src/utils/twilio.util';
 import { GetJobsDto } from './dto/get-jobs.dto';
-import { AddressParserUtil, ParsedAddress } from 'src/utils/address-parser.util';
+import { AddressParserUtil } from 'src/utils/address-parser.util';
+import { UpdateJobDto } from './dto/update-job.dto';
 
 @Injectable()
 export class JobsService {
@@ -16,7 +16,7 @@ export class JobsService {
     private prisma: PrismaService,
     private geocoderUtil: GeocoderUtil,
     private twilioUtil: TwilioUtil,
-    private addressParser: AddressParserUtil, 
+    private addressParser: AddressParserUtil,
   ) {}
 
   async createJob(createJobDto: CreateJobDto) {
@@ -71,10 +71,12 @@ export class JobsService {
       }
 
       // Parse address with geocoding primary + regex fallback
-    this.logger.log(`Parsing address: ${createJobDto.serviceAddress}`);
-    const parsedAddress = await this.addressParser.parseAddress(createJobDto.serviceAddress);
+      this.logger.log(`Parsing address: ${createJobDto.serviceAddress}`);
+      const parsedAddress = await this.addressParser.parseAddress(
+        createJobDto.serviceAddress,
+      );
 
-    this.logger.debug(`Parsed address: ${JSON.stringify(parsedAddress)}`);
+      this.logger.debug(`Parsed address: ${JSON.stringify(parsedAddress)}`);
 
       // Geocode the service address if lat/lng not provided
       let latitude = createJobDto.latitude;
@@ -172,45 +174,51 @@ export class JobsService {
     try {
       this.logger.log('Fetching jobs...');
 
-      const {
-        zipCode,
-        status,
-        startDate,
-        endDate,
-        page = 1,
-        limit = 10,
-      } = getJobsDto;
+      const { city, search, date, status, page = 1, limit = 10 } = getJobsDto;
 
       // Calculate skip for pagination
       const skip = (page - 1) * limit;
 
-      // Build where clause - FIXED: Proper status filtering
+      // Build where clause
       const where: any = {};
 
-      // Filter by zip code
-      if (zipCode) {
-        where.zipCode = zipCode;
+      // Filter by city
+      if (city) {
+        where.city = {
+          contains: city,
+          mode: 'insensitive',
+        };
       }
 
-      // Filter by status - FIXED: Use exact status value
+      // Filter by status
       if (status) {
         where.status = status;
       }
 
-      // Filter by date range
-      if (startDate || endDate) {
-        where.scheduledDate = {};
+      // Filter by createdAt date
+      if (date) {
+        const startDate = new Date(date);
+        const endDate = new Date(date);
+        endDate.setDate(endDate.getDate() + 1);
 
-        if (startDate) {
-          where.scheduledDate.gte = new Date(startDate);
-        }
+        where.createdAt = {
+          gte: startDate,
+          lt: endDate,
+        };
+      }
 
-        if (endDate) {
-          // End of the end date (include the entire day)
-          const endDateTime = new Date(endDate);
-          endDateTime.setHours(23, 59, 59, 999);
-          where.scheduledDate.lte = endDateTime;
-        }
+      // General search across multiple fields
+      if (search) {
+        where.OR = [
+          { customerName: { contains: search, mode: 'insensitive' } },
+          { customerPhone: { contains: search, mode: 'insensitive' } },
+          { customerEmail: { contains: search, mode: 'insensitive' } },
+          { serviceAddress: { contains: search, mode: 'insensitive' } },
+          { jobDescription: { contains: search, mode: 'insensitive' } },
+          { city: { contains: search, mode: 'insensitive' } },
+          { state: { contains: search, mode: 'insensitive' } },
+          { zipCode: { contains: search, mode: 'insensitive' } },
+        ];
       }
 
       // Get total count for pagination metadata
@@ -243,7 +251,6 @@ export class JobsService {
       const hasPrevPage = page > 1;
 
       const paginationData = {
-        jobs,
         pagination: {
           currentPage: page,
           totalPages,
@@ -252,6 +259,7 @@ export class JobsService {
           hasNextPage,
           hasPrevPage,
         },
+        jobs,
       };
 
       return sendResponse(
@@ -266,6 +274,90 @@ export class JobsService {
         HttpStatus.INTERNAL_SERVER_ERROR,
         false,
         'Failed to fetch jobs',
+        null,
+      );
+    }
+  }
+
+  async updateJob(id: string, updateJobDto: UpdateJobDto) {
+    try {
+      // Check if job exists
+      const existingJob = await this.prisma.job.findUnique({
+        where: { id },
+      });
+
+      if (!existingJob) {
+        return sendResponse(HttpStatus.NOT_FOUND, false, 'Job not found', null);
+      }
+
+      // If serviceAddress is updated, re-parse address
+      let updateData: any = { ...updateJobDto };
+
+      if (updateJobDto.serviceAddress) {
+        const parsedAddress = await this.addressParser.parseAddress(
+          updateJobDto.serviceAddress,
+        );
+        updateData = {
+          ...updateData,
+          street: parsedAddress.street,
+          city: parsedAddress.city,
+          state: parsedAddress.state,
+          stateCode: parsedAddress.stateCode,
+        };
+      }
+
+      // Validate technician if provided
+      if (updateJobDto.technicianId) {
+        const technician = await this.prisma.technician.findUnique({
+          where: { id: updateJobDto.technicianId },
+        });
+        if (!technician) {
+          return sendResponse(
+            HttpStatus.NOT_FOUND,
+            false,
+            'Technician not found',
+            null,
+          );
+        }
+      }
+
+      // Validate timeSlot if provided
+      if (updateJobDto.timeSlotId) {
+        const timeSlot = await this.prisma.defaultTimeSlot.findUnique({
+          where: { id: updateJobDto.timeSlotId },
+        });
+        if (!timeSlot) {
+          return sendResponse(
+            HttpStatus.NOT_FOUND,
+            false,
+            'Time slot not found',
+            null,
+          );
+        }
+      }
+
+      // Update the job
+      const updatedJob = await this.prisma.job.update({
+        where: { id },
+        data: updateData,
+        include: {
+          timeSlot: true,
+          technician: true,
+        },
+      });
+
+      return sendResponse(
+        HttpStatus.OK,
+        true,
+        'Job updated successfully',
+        updatedJob,
+      );
+    } catch (error) {
+      this.logger.error('Error updating job:', error);
+      return sendResponse(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        false,
+        'Failed to update job',
         null,
       );
     }

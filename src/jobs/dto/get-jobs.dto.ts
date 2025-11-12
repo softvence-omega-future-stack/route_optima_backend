@@ -1,26 +1,32 @@
-import { IsOptional, IsString, IsInt, Min, IsEnum, IsDateString } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsInt,
+  Min,
+  IsEnum,
+  IsDateString,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { JobStatus } from '@prisma/client';
-
 
 export class GetJobsDto {
   @IsOptional()
   @IsString()
-  zipCode?: string;
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @IsOptional()
+  @IsDateString()
+  date?: string;
 
   @IsOptional()
   @IsEnum(JobStatus)
   status?: JobStatus;
 
-  @IsOptional()
-  @IsDateString()
-  startDate?: string; 
-
-  @IsOptional()
-  @IsDateString()
-  endDate?: string; 
-
-  @IsOptional()
+ @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
