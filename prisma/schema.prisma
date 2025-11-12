@@ -25,17 +25,17 @@ enum JobStatus {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String?
-  photo     String?
-  role      UserRole @default(ADMIN)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String                @id @default(uuid())
+  email              String                @unique
+  password           String
+  name               String?
+  photo              String?
+  role               UserRole              @default(ADMIN)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
-  technicianId String?     @unique
-  technician   Technician? @relation(fields: [technicianId], references: [id])
+  technicianId       String?               @unique
+  technician         Technician?          @relation(fields: [technicianId], references: [id])
 
   sessions           Session[]
   PasswordResetToken PasswordResetToken[]
@@ -43,93 +43,97 @@ model User {
 
 // Model for managing long-term user sessions and tokens.
 model Session {
-  id     String @id @default(uuid())
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
+  id           String    @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
 
   refreshToken String?
   expiresAt    DateTime
-  isActive     Boolean  @default(true)
+  isActive     Boolean   @default(true)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 model PasswordResetToken {
-  id        String   @id @default(uuid())
-  token     String   @unique
+  id        String    @id @default(uuid())
+  token     String    @unique
   userId    String
   user      User     @relation(fields: [userId], references: [id])
   expiresAt DateTime
-  used      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  used      Boolean   @default(false)
+  createdAt DateTime  @default(now())
 }
 
 // Model for managing field technicians
 model Technician {
-  id            String  @id @default(uuid())
+  id            String    @id @default(uuid())
   name          String
-  phone         String  @unique
+  phone         String    @unique
   address       String?
   photo         String?
   workStartTime String?
   workEndTime   String?
-  isActive      Boolean @default(true)
+  isActive      Boolean   @default(true)
 
-  user User?
+  user          User?
 
-  jobs      Job[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  jobs          Job[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model DefaultTimeSlot {
-  id        String  @id @default(uuid())
-  label     String
+  id                                                   String    @id @default(uuid())
+  label                                                String
   startTime String // Format: "08:00" (24-hour format)
   endTime   String // Format: "10:00" (24-hour format)
-  order     Int     @default(autoincrement())
-  isActive  Boolean @default(true)
-  jobs      Job[]
+  order                                                Int       @default(autoincrement())
+  isActive                                             Boolean   @default(true)
+  jobs                                                 Job[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt                                            DateTime  @default(now())
+  updatedAt                                            DateTime  @updatedAt
 
-  @@index([isActive, order])
+  @@index([isActive,                                   order])
 }
 
 // Model for a scheduled job or appointment
 model Job {
-  id             String  @id @default(uuid())
+  id                                            String           @id @default(uuid())
   // Customer Information
-  customerName   String
-  customerPhone  String
-  customerEmail  String?
-  serviceAddress String
-  zipCode        String?
-  latitude       Float?
-  longitude      Float?
+  customerName                                  String
+  customerPhone                                 String
+  customerEmail                                 String?
+  serviceAddress                                String
+  zipCode                                       String?
+  street                                        String?
+  city                                          String?
+  state                                         String?
+  stateCode                                     String?
+  latitude                                      Float?
+  longitude                                     Float?
 
   // Job Details
-  jobDescription String
+  jobDescription                                String
 
   // Schedule Information (already in Job - perfect!)
   scheduledDate DateTime // Date from form
   timeSlotId    String // Selected time slot ID
-  timeSlot      DefaultTimeSlot @relation(fields: [timeSlotId], references: [id])
-  technicianId  String
-  technician    Technician      @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+  timeSlot                                      DefaultTimeSlot @relation(fields: [timeSlotId], references: [id])
+  technicianId                                  String
+  technician                                    Technician      @relation(fields: [technicianId], references: [id], onDelete: Cascade)
 
-  status    JobStatus @default(PENDING)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  status                                        JobStatus        @default(PENDING)
+  createdAt                                     DateTime         @default(now())
+  updatedAt                                     DateTime         @updatedAt
 }
 
 model NotificationPreferences {
-  id                String  @id @default("singleton")
-  sendCustomerEmail Boolean @default(true)
-  sendTechnicianSMS Boolean @default(true)
+  id                String    @id @default("singleton")
+  sendCustomerEmail Boolean   @default(true)
+  sendTechnicianSMS Boolean   @default(true)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }

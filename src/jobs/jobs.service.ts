@@ -6,6 +6,7 @@ import { PrismaService } from 'prisma/prisma.service';
 import { GeocoderUtil } from 'src/utils/geocoder.util';
 import { TwilioUtil } from 'src/utils/twilio.util';
 import { GetJobsDto } from './dto/get-jobs.dto';
+import { AddressParserUtil, ParsedAddress } from 'src/utils/address-parser.util';
 
 @Injectable()
 export class JobsService {
@@ -15,6 +16,7 @@ export class JobsService {
     private prisma: PrismaService,
     private geocoderUtil: GeocoderUtil,
     private twilioUtil: TwilioUtil,
+    private addressParser: AddressParserUtil, 
   ) {}
 
   async createJob(createJobDto: CreateJobDto) {
@@ -68,6 +70,12 @@ export class JobsService {
         );
       }
 
+      // Parse address with geocoding primary + regex fallback
+    this.logger.log(`Parsing address: ${createJobDto.serviceAddress}`);
+    const parsedAddress = await this.addressParser.parseAddress(createJobDto.serviceAddress);
+
+    this.logger.debug(`Parsed address: ${JSON.stringify(parsedAddress)}`);
+
       // Geocode the service address if lat/lng not provided
       let latitude = createJobDto.latitude;
       let longitude = createJobDto.longitude;
@@ -100,7 +108,11 @@ export class JobsService {
           customerPhone: createJobDto.customerPhone,
           customerEmail: createJobDto.customerEmail,
           serviceAddress: createJobDto.serviceAddress,
-          zipCode: createJobDto.zipCode,
+          street: parsedAddress.street,
+          city: parsedAddress.city,
+          state: parsedAddress.state,
+          stateCode: parsedAddress.stateCode,
+          zipCode: parsedAddress.zipCode || createJobDto.zipCode,
 
           // Job Details
           jobDescription: createJobDto.jobDescription,
