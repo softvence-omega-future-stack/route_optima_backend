@@ -1,7 +1,13 @@
-import { BadRequestException, Injectable, ConflictException, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  ConflictException,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { CreateTechnicianDto } from './dto/create-technician.dto';
-import { Prisma } from '@prisma/client';
+import { JobStatus, Prisma } from '@prisma/client';
 import { GetAllTechniciansDto } from './dto/get-all-technicians-dto';
 import { UpdateTechnicianDto } from './dto/update-technician.dto';
 import { join } from 'path';
@@ -9,7 +15,7 @@ import { existsSync, unlinkSync } from 'fs';
 
 @Injectable()
 export class TechnicianService {
-  constructor(private prisma: PrismaService) { }
+  constructor(private prisma: PrismaService) {}
 
   private async deletePhotoFile(photoPath: string | null): Promise<void> {
     if (!photoPath) return;
@@ -42,10 +48,8 @@ export class TechnicianService {
     }
   }
 
-
   async createTechnician(dto: CreateTechnicianDto) {
     try {
-
       // Validate work hours if both are provided
       if (dto.workStartTime && dto.workEndTime) {
         this.validateWorkHours(dto.workStartTime, dto.workEndTime);
@@ -57,7 +61,9 @@ export class TechnicianService {
           where: { phone: dto.phone },
         });
         if (existing) {
-          throw new ConflictException('Technician with this phone already exists');
+          throw new ConflictException(
+            'Technician with this phone already exists',
+          );
         }
       }
 
@@ -77,14 +83,15 @@ export class TechnicianService {
         message: 'Technician created successfully',
         technician,
       };
-
     } catch (error) {
       // Handle known Prisma errors
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         switch (error.code) {
           case 'P2002':
             // Unique constraint violation
-            throw new ConflictException('Technician with this phone number already exists');
+            throw new ConflictException(
+              'Technician with this phone number already exists',
+            );
           case 'P2003':
             // Foreign key constraint violation
             throw new BadRequestException('Invalid reference data provided');
@@ -98,7 +105,10 @@ export class TechnicianService {
       }
 
       // Handle NestJS HTTP exceptions (like the ConflictException we threw)
-      if (error instanceof BadRequestException || error instanceof ConflictException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof ConflictException
+      ) {
         throw error;
       }
 
@@ -134,12 +144,12 @@ export class TechnicianService {
           // Search across name, phone, and address (case-insensitive, partial match)
           search
             ? {
-              OR: [
-                { name: { contains: search, mode: 'insensitive' } },
-                { phone: { contains: search, mode: 'insensitive' } },
-                { address: { contains: search, mode: 'insensitive' } },
-              ],
-            }
+                OR: [
+                  { name: { contains: search, mode: 'insensitive' } },
+                  { phone: { contains: search, mode: 'insensitive' } },
+                  { address: { contains: search, mode: 'insensitive' } },
+                ],
+              }
             : {},
           // Filter by address (case-insensitive, partial match)
           address
@@ -173,13 +183,76 @@ export class TechnicianService {
         this.prisma.technician.count({ where: whereClause }),
       ]);
 
+      // Get today's date range for job statistics
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+
+      // Get today's job statistics for each technician
+      const techniciansWithStats = await Promise.all(
+        technicians.map(async (technician) => {
+          // Get today's assigned jobs count
+          const todayAssigned = await this.prisma.job.count({
+            where: {
+              technicianId: technician.id,
+              createdAt: {
+                gte: todayStart,
+                lt: todayEnd,
+              },
+              status: {
+                in: [
+                  JobStatus.ASSIGNED,
+                  JobStatus.PENDING,
+                  JobStatus.COMPLETED,
+                ],
+              },
+            },
+          });
+
+          // Get today's completed jobs count
+          const todayCompleted = await this.prisma.job.count({
+            where: {
+              technicianId: technician.id,
+              updatedAt: {
+                gte: todayStart,
+                lt: todayEnd,
+              },
+              status: JobStatus.COMPLETED,
+            },
+          });
+
+          // Get today's pending jobs count
+          const todayPending = await this.prisma.job.count({
+            where: {
+              technicianId: technician.id,
+              status: JobStatus.PENDING,
+              scheduledDate: {
+                gte: todayStart,
+                lt: todayEnd,
+              },
+            },
+          });
+
+          return {
+            ...technician,
+            todayStats: {
+              assigned: todayAssigned,
+              completed: todayCompleted,
+              pending: todayPending,
+            },
+          };
+        }),
+      );
+
       // Calculate pagination metadata
       const totalPages = Math.ceil(totalCount / limit);
       const hasNextPage = page < totalPages;
       const hasPrevPage = page > 1;
 
       return {
-        technicians,
+        technicians: techniciansWithStats,
         meta: {
           total: totalCount,
           page,
@@ -303,7 +376,9 @@ export class TechnicianService {
         });
 
         if (phoneExists) {
-          throw new ConflictException('Phone number already in use by another technician');
+          throw new ConflictException(
+            'Phone number already in use by another technician',
+          );
         }
       }
 
@@ -313,8 +388,10 @@ export class TechnicianService {
       if (dto.name !== undefined) updateData.name = dto.name;
       if (dto.phone !== undefined) updateData.phone = dto.phone;
       if (dto.address !== undefined) updateData.address = dto.address;
-      if (dto.workStartTime !== undefined) updateData.workStartTime = dto.workStartTime;
-      if (dto.workEndTime !== undefined) updateData.workEndTime = dto.workEndTime;
+      if (dto.workStartTime !== undefined)
+        updateData.workStartTime = dto.workStartTime;
+      if (dto.workEndTime !== undefined)
+        updateData.workEndTime = dto.workEndTime;
       if (dto.photo !== undefined) updateData.photo = dto.photo;
       if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
 
@@ -396,7 +473,7 @@ export class TechnicianService {
       }
 
       return {
-        message: "Technician deleted successfully",
+        message: 'Technician deleted successfully',
       };
     } catch (error) {
       // Handle known Prisma errors
@@ -432,6 +509,4 @@ export class TechnicianService {
       throw new InternalServerErrorException('Failed to delete technician');
     }
   }
-
-
 }
