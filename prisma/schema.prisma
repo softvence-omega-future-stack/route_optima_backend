@@ -120,7 +120,7 @@ model Job {
   technicianId  String
   technician    Technician      @relation(fields: [technicianId], references: [id], onDelete: Cascade)
 
-  status    JobStatus @default(ASSIGNED)
+  status    JobStatus @default(PENDING)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
