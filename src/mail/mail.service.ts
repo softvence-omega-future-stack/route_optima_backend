@@ -24,7 +24,7 @@ export class MailService {
     const mailOptions: nodemailer.SendMailOptions = {
       from: `"Dispatch Bros Support" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: '🔐 Reset Your Password – Dispatch Bros',
+      subject: 'Reset Your Password – Dispatch Bros',
       html: this.buildPasswordResetTemplate(resetUrl),
     };
 
@@ -42,7 +42,7 @@ export class MailService {
       <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f6f8; padding: 40px 0; text-align: center;">
         <div style="max-width: 600px; background: #ffffff; margin: auto; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
           <div style="background: #111827; padding: 24px;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 24px;">🚚 Dispatch Bros</h1>
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Dispatch Bros</h1>
           </div>
           <div style="padding: 32px 24px; color: #374151;">
             <h2 style="margin-bottom: 16px; color: #111827;">Password Reset Request</h2>
