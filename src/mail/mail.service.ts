@@ -19,7 +19,7 @@ export class MailService {
   }
 
   async sendPasswordResetMail(email: string, token: string): Promise<void> {
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
+    const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
 
     const mailOptions: nodemailer.SendMailOptions = {
       from: `"Dispatch Bros Support" <${process.env.EMAIL_USER}>`,
