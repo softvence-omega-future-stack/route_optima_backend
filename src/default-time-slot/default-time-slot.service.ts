@@ -59,10 +59,21 @@ export class DefaultTimeSlotService {
       // Check if time slot exists
       const existingSlot = await this.prisma.defaultTimeSlot.findUnique({
         where: { id },
+        include: {
+            jobs: true,
+        }
       });
 
       if (!existingSlot) {
         throw new NotFoundException('Time slot not found');
+      }
+
+      // Check if time slot has booked jobs (prevent updates if booked)
+      if (existingSlot.jobs && existingSlot.jobs.length > 0) {
+        throw new BadRequestException(
+          `Cannot update time slot. It is referenced by ${existingSlot.jobs.length} job. ` +
+          `Please reassign or delete the related jobs first.`
+        );
       }
 
       // If times are being updated, validate them
@@ -91,7 +102,7 @@ export class DefaultTimeSlotService {
         where: { id },
         data: {
           ...updateDto,
-          ...(label !== existingSlot.label && { label }), // Only update label if it changed
+          ...(label !== existingSlot.label && { label }), 
         },
       });
     } catch (error) {
@@ -153,7 +164,7 @@ export class DefaultTimeSlotService {
       // Check if there are related jobs
       if (existingSlot.jobs && existingSlot.jobs.length > 0) {
         throw new BadRequestException(
-          `Cannot delete time slot. It is referenced by ${existingSlot.jobs.length} job(s). ` +
+          `Cannot delete time slot. It is referenced by ${existingSlot.jobs.length} jobs. ` +
             `Please reassign or delete the related jobs first.`,
         );
       }
