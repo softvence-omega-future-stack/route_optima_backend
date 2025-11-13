@@ -26,16 +26,26 @@ import { UserRole } from '@prisma/client';
 
 @Controller('api/v1/auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) { }
+  constructor(private readonly authService: AuthService) {}
 
   @Post('register')
   @UsePipes(new ValidationPipe())
-  async register(@Body() userRegistrationData: RegisterDto, @Res() res: Response) {
+  async register(
+    @Body() userRegistrationData: RegisterDto,
+    @Res() res: Response,
+  ) {
     try {
       const { user } = await this.authService.register(userRegistrationData);
       return res
         .status(HttpStatus.CREATED)
-        .json(sendResponse(HttpStatus.CREATED, true, 'User created successfully', user));
+        .json(
+          sendResponse(
+            HttpStatus.CREATED,
+            true,
+            'User created successfully',
+            user,
+          ),
+        );
     } catch (error) {
       const status = error.status || error.statusCode || HttpStatus.BAD_REQUEST;
       return res
@@ -43,7 +53,6 @@ export class AuthController {
         .json(sendResponse(status, false, 'User creation failed', error));
     }
   }
-
 
   @Post('login')
   @HttpCode(200)
@@ -59,7 +68,7 @@ export class AuthController {
         httpOnly: true,
         secure: true,
         sameSite: 'strict',
-        maxAge: 1000 * 60 * 60, // 60 minutes
+        maxAge: 1000 * 60 * 15, // 15 minutes
       });
 
       res.cookie('refresh_token', loginResult.refreshToken, {
@@ -74,14 +83,14 @@ export class AuthController {
         message: 'Logged in successfully',
         token: {
           accessToken: loginResult.accessToken,
-          refreshToken: loginResult.refreshToken
-        }
+          refreshToken: loginResult.refreshToken,
+        },
       };
     } catch (error) {
       return {
         success: false,
         message: 'Login failed',
-        error: error.message || error
+        error: error.message || error,
       };
     }
   }
@@ -95,76 +104,73 @@ export class AuthController {
         throw new UnauthorizedException('User not authenticated');
       }
       const admin = await this.authService.getCurrentAdmin(user.id);
-      return sendResponse(HttpStatus.OK, true, 'Current admin fetched successfully', admin);
+      return sendResponse(
+        HttpStatus.OK,
+        true,
+        'Current admin fetched successfully',
+        admin,
+      );
     } catch (error) {
       const status = error.status || HttpStatus.BAD_REQUEST;
-      return sendResponse(status, false, 'Failed to get current admin', error.message || error);
+      return sendResponse(
+        status,
+        false,
+        'Failed to get current admin',
+        error.message || error,
+      );
     }
   }
 
   @Post('refresh')
   @HttpCode(200)
-  async refreshTokens(@Req() req, @Res({ passthrough: true }) res: Response) {
-    const refreshToken = req.cookies?.refresh_token;
+  async refreshTokens(@Body('refreshToken') refreshToken: string) {
+    const { accessToken } = await this.authService.refreshTokens(refreshToken);
 
-    const { accessToken, refreshToken: newRefreshToken } =
-      await this.authService.refreshTokens(refreshToken);
-
-    res.cookie('access_token', accessToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-    });
-    res.cookie('refresh_token', newRefreshToken, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
-    });
-
-    return { message: 'Token refreshed' };
-  }
-
-  @Post('logout-session')
-  @HttpCode(200)
-  async logout(
-    @Body('sessionId') sessionId: string,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    try {
-      // Call service
-      await this.authService.logoutBySessionId(sessionId);
-
-      // Clear cookies
-      res.clearCookie('access_token', { httpOnly: true, sameSite: 'strict' });
-      res.clearCookie('refresh_token', { httpOnly: true, sameSite: 'strict' });
-
-      return sendResponse(HttpStatus.OK, true, 'Logged out successfully');
-    } catch (error) {
-      return sendResponse(HttpStatus.BAD_REQUEST, false, 'Logout failed', error);
-    }
+    return {
+      message: 'Token refreshed successfully',
+      accessToken,
+    };
   }
 
 
   @Post('logout')
   @HttpCode(200)
-  async logoutByToken(@Req() req, @Res({ passthrough: true }) res: Response) {
+  async logout(
+    @Body('refreshToken') refreshToken: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     try {
-      const refreshToken = req.cookies?.refresh_token;
-
       if (!refreshToken) {
-        return sendResponse(HttpStatus.BAD_REQUEST, false, 'No refresh token found');
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          'Refresh token is required',
+        );
       }
 
       // Call service to remove token from DB
       await this.authService.logoutByToken(refreshToken);
 
       // Clear cookies
-      res.clearCookie('access_token', { httpOnly: true, sameSite: 'strict', secure: true });
-      res.clearCookie('refresh_token', { httpOnly: true, sameSite: 'strict', secure: true });
+      res.clearCookie('access_token', {
+        httpOnly: true,
+        sameSite: 'strict',
+        secure: true,
+      });
+      res.clearCookie('refresh_token', {
+        httpOnly: true,
+        sameSite: 'strict',
+        secure: true,
+      });
 
       return sendResponse(HttpStatus.OK, true, 'Logged out successfully');
     } catch (error) {
-      return sendResponse(HttpStatus.BAD_REQUEST, false, 'Logout failed', error);
+      return sendResponse(
+        HttpStatus.BAD_REQUEST,
+        false,
+        'Logout failed',
+        error.message || error,
+      );
     }
   }
 
@@ -175,7 +181,12 @@ export class AuthController {
       return sendResponse(HttpStatus.OK, true, result.message);
     } catch (error) {
       const status = error.status || HttpStatus.BAD_REQUEST;
-      return sendResponse(status, false, 'Password reset request failed', error.message || error);
+      return sendResponse(
+        status,
+        false,
+        'Password reset request failed',
+        error.message || error,
+      );
     }
   }
 
@@ -189,7 +200,12 @@ export class AuthController {
       return sendResponse(HttpStatus.OK, true, result.message);
     } catch (error) {
       const status = error.status || HttpStatus.BAD_REQUEST;
-      return sendResponse(status, false, 'Password reset failed', error.message || error);
+      return sendResponse(
+        status,
+        false,
+        'Password reset failed',
+        error.message || error,
+      );
     }
   }
 
@@ -201,8 +217,12 @@ export class AuthController {
       return sendResponse(HttpStatus.OK, true, 'Token is valid', payload);
     } catch (error) {
       const status = error.status || HttpStatus.UNAUTHORIZED;
-      return sendResponse(status, false, 'Token verification failed', error.message || error);
+      return sendResponse(
+        status,
+        false,
+        'Token verification failed',
+        error.message || error,
+      );
     }
   }
-
 }

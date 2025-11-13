@@ -10,8 +10,8 @@ import { MailService } from 'src/mail/mail.service';
   imports: [
     PrismaModule,
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'default-access-secret-key',
-      signOptions: { expiresIn: '60m' },
+      secret: process.env.JWT_SECRET || '1e7449b52f6582bc87373bf6ed8d50b8e5a59',
+      signOptions: { expiresIn: '15m' },
     }),
   ],
   controllers: [AuthController],

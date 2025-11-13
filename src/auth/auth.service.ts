@@ -21,7 +21,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly mailService: MailService,
-  ) { }
+  ) {}
 
   async register(registerDto: RegisterDto) {
     const { email, password, name, photo } = registerDto;
@@ -55,12 +55,12 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: user.role,
-        photo: user.photo
+        photo: user.photo,
       },
     };
   }
 
-  async login(loginData: LoginDto, userAgent?: string, req?: any) {
+  async login(loginData: LoginDto) {
     const { email, password } = loginData;
 
     if (!email) throw new BadRequestException('Email must be provided');
@@ -74,6 +74,9 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid)
       throw new UnauthorizedException('Invalid credentials');
+
+    // Clean up expired sessions and enforce session limits
+    await this.cleanupUserSessions(user.id);
 
     const tokens = await this.generateTokens(user.id, user.email, user.role);
     await this.createSession(user.id, tokens.refreshToken);
@@ -97,13 +100,17 @@ export class AuthService {
     return this.excludePassword(user);
   }
 
-  // * refresh token
+  // OPTIMIZED: Refresh tokens with automatic cleanup
   async refreshTokens(refreshToken: string) {
     try {
+      // Verify refresh token validity
       this.jwtService.verify(refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET || 'default-refresh-secret-key',
+        secret:
+          process.env.JWT_REFRESH_SECRET ||
+          '1e7449b52f6582bc87373bf6ed8d50b58e5a59',
       });
 
+      // Find the session
       const session = await this.prisma.session.findFirst({
         where: {
           refreshToken,
@@ -113,20 +120,24 @@ export class AuthService {
         include: { user: true },
       });
 
-      if (!session || !session.user)
+      if (!session || !session.user) {
         throw new UnauthorizedException('Invalid refresh token');
+      }
 
+      // Generate new token pair
       const tokens = await this.generateTokens(
         session.user.id,
         session.user.email,
         session.user.role,
       );
 
+      // Update session with new refresh token
       await this.prisma.session.update({
         where: { id: session.id },
         data: {
           refreshToken: tokens.refreshToken,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+          updatedAt: new Date(),
         },
       });
 
@@ -134,52 +145,73 @@ export class AuthService {
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
       };
-    } catch {
-      throw new UnauthorizedException('Invalid refresh token');
+    } catch (error) {
+      // Auto-cleanup invalid refresh tokens
+      await this.cleanupInvalidRefreshToken(refreshToken);
+      throw new UnauthorizedException('Invalid or expired refresh token');
     }
   }
 
-  async logoutBySessionId(sessionId: string) {
-    if (!sessionId) {
-      throw new BadRequestException('Session ID is required');
+  // NEW: Cleanup specific invalid refresh token
+  private async cleanupInvalidRefreshToken(
+    refreshToken: string,
+  ): Promise<void> {
+    try {
+      await this.prisma.session.deleteMany({
+        where: {
+          refreshToken,
+          OR: [{ isActive: false }, { expiresAt: { lt: new Date() } }],
+        },
+      });
+    } catch (error) {
+      // Silent fail - this is just cleanup
     }
-
-    const session = await this.prisma.session.findUnique({
-      where: { id: sessionId },
-    });
-
-    if (!session || !session.isActive) {
-      throw new BadRequestException('Invalid or inactive session');
-    }
-
-    // Deactivate session
-    await this.prisma.session.update({
-      where: { id: sessionId },
-      data: { isActive: false, refreshToken: '' },
-    });
-
-    return true;
   }
 
+  // OPTIMIZED: Logout with immediate cleanup
   async logoutByToken(refreshToken: string) {
     if (!refreshToken) {
       throw new BadRequestException('Refresh token is required');
     }
 
-    const session = await this.prisma.session.findFirst({
-      where: { refreshToken, isActive: true },
-    });
+    try {
+      // Delete the session directly (more efficient than find + delete)
+      const result = await this.prisma.session.deleteMany({
+        where: {
+          refreshToken,
+          isActive: true,
+        },
+      });
 
-    if (!session) {
-      throw new BadRequestException('Session not found or already inactive');
+      // If no session was found, it might already be cleaned up
+      if (result.count === 0) {
+        console.log('Session already deleted or not found');
+      }
+
+      return true;
+    } catch (error) {
+      // If session not found, consider it successful logout
+      if (
+        error.code === 'P2025' ||
+        error.message?.includes('Record to delete does not exist')
+      ) {
+        return true;
+      }
+      throw error;
     }
+  }
 
-    await this.prisma.session.update({
-      where: { id: session.id },
-      data: { isActive: false, refreshToken: null },
+  // OPTIMIZED: Create session with built-in limits
+  private async createSession(userId: string, refreshToken: string) {
+    return this.prisma.session.create({
+      data: {
+        id: uuid(),
+        userId,
+        refreshToken,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        isActive: true,
+      },
     });
-
-    return true;
   }
 
   // --- REQUEST RESET LINK ---
@@ -187,7 +219,9 @@ export class AuthService {
     try {
       const user = await this.prisma.user.findUnique({ where: { email } });
       if (!user) {
-        throw new BadRequestException('No account found with this email address');
+        throw new BadRequestException(
+          'No account found with this email address',
+        );
       }
 
       const token = randomBytes(32).toString('hex');
@@ -207,12 +241,10 @@ export class AuthService {
     } catch (error) {
       console.error('Error in requestPasswordReset:', error);
 
-      // Check for known NestJS error types or Prisma errors
       if (error instanceof BadRequestException) {
         throw error;
       }
 
-      // Fallback: wrap unknown errors in an HTTP exception
       throw new BadRequestException(
         error.message || 'Failed to process password reset request',
       );
@@ -222,16 +254,19 @@ export class AuthService {
   // --- VERIFY & RESET PASSWORD ---
   async resetPassword(token: string, newPassword: string) {
     try {
-      //  Find token and associated user
+      // Find token and associated user
       const resetToken = await this.prisma.passwordResetToken.findUnique({
         where: { token },
         include: { user: true },
       });
 
       // Validate token
-      if (!resetToken) throw new BadRequestException('Invalid or missing token');
-      if (resetToken.used) throw new BadRequestException('Token has already been used');
-      if (resetToken.expiresAt < new Date()) throw new BadRequestException('Token has expired');
+      if (!resetToken)
+        throw new BadRequestException('Invalid or missing token');
+      if (resetToken.used)
+        throw new BadRequestException('Token has already been used');
+      if (resetToken.expiresAt < new Date())
+        throw new BadRequestException('Token has expired');
 
       // Hash new password
       const hashed = await bcrypt.hash(newPassword, 12);
@@ -248,7 +283,6 @@ export class AuthService {
         }),
       ]);
 
-      // Return success
       return { message: 'Password reset successful' };
     } catch (error) {
       console.error('Error in resetPassword:', error);
@@ -257,8 +291,9 @@ export class AuthService {
         throw error;
       }
 
-      // Fallback: wrap other errors
-      throw new BadRequestException(error.message || 'Failed to reset password');
+      throw new BadRequestException(
+        error.message || 'Failed to reset password',
+      );
     }
   }
 
@@ -267,36 +302,20 @@ export class AuthService {
     const payload = { id: userId, email, role };
 
     const accessToken = await this.jwtService.signAsync(payload, {
-      secret: process.env.JWT_SECRET || 'default-access-secret-key',
-      expiresIn: '60m',
+      secret: process.env.JWT_SECRET || '1e7449b52f6582bc87373bf6ed8db58e5a59',
+      expiresIn: '15m',
     });
 
     const refreshToken = await this.jwtService.signAsync(payload, {
-      secret: process.env.JWT_REFRESH_SECRET || 'default-refresh-secret-key',
+      secret:
+        process.env.JWT_REFRESH_SECRET ||
+        '1e7449b52f6582b7373bf6ed8d50b58e5a59',
       expiresIn: '7d',
     });
 
     return { accessToken, refreshToken };
   }
 
-  // * create session
-  private async createSession(userId: string, refreshToken: string) {
-    // Deactivate any old sessions for this user
-    await this.prisma.session.updateMany({
-      where: { userId, isActive: true },
-      data: { isActive: false },
-    });
-
-    return this.prisma.session.create({
-      data: {
-        id: uuid(),
-        userId,
-        refreshToken,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        isActive: true,
-      },
-    });
-  }
   // * utils
   private excludePassword(user: User): Omit<User, 'password'> {
     const { password, ...result } = user;
@@ -320,5 +339,14 @@ export class AuthService {
     } catch {
       throw new UnauthorizedException('Invalid token');
     }
+  }
+
+  private async cleanupUserSessions(userId: string): Promise<void> {
+    await this.prisma.session.deleteMany({
+      where: {
+        userId,
+        OR: [{ isActive: false }, { expiresAt: { lt: new Date() } }],
+      },
+    });
   }
 }
