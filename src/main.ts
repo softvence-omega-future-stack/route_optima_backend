@@ -11,8 +11,6 @@ if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
 }
 
-
-
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const logger = new Logger('Bootstrap');
@@ -28,7 +26,7 @@ async function bootstrap() {
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    credentials: false, 
+    credentials: false,
   });
 
   // Global validation pipe - CRITICAL for DTO validation and transformation
@@ -52,4 +50,3 @@ async function bootstrap() {
 }
 
 bootstrap();
-

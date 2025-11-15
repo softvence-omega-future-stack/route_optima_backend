@@ -186,6 +186,8 @@ export class JobsService {
           message,
         );
 
+        console.log("seddddd", smsResult)
+
         smsStatus = {
           sent: smsResult.success,
           message: smsResult.message,
