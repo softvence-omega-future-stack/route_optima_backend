@@ -71,8 +71,8 @@ export class TechnicianController {
         HttpStatus.OK,
         true,
         'Technicians retrieved successfully',
-        result.meta,
         result.technicians,
+        result.meta,
         res
       );
     } catch (error) {

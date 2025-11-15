@@ -58,6 +58,31 @@ export class JobsService {
         );
       }
 
+      if (!technician.isActive) {
+        return sendResponse(
+          HttpStatus.NOT_FOUND,
+          false,
+          'This technician is inactive and cannot be assigned to a job.',
+        );
+      }
+
+      const conflict = await this.prisma.job.findFirst({
+        where: {
+          technicianId: createJobDto.technicianId,
+          scheduledDate: new Date(createJobDto.scheduledDate),
+          timeSlotId: createJobDto.timeSlotId,
+          status: { notIn: [JobStatus.PENDING] }
+        },
+      });
+
+      if (conflict) {
+        return sendResponse(
+          HttpStatus.NOT_FOUND,
+          false,
+          'This technician is already booked for the same date and time slot.',
+        );
+      }
+
       const timeSlot = await this.prisma.defaultTimeSlot.findUnique({
         where: { id: createJobDto.timeSlotId },
       });
@@ -144,16 +169,16 @@ export class JobsService {
 
       if (technicianWantsSMS) {
         const message = `
-New Job Assigned
+          New Job Assigned
 
-Customer: ${job.customerName}
-Address: ${job.serviceAddress}
-Phone: ${job.customerPhone}
+          Customer: ${job.customerName}
+          Address: ${job.serviceAddress}
+          Phone: ${job.customerPhone}
 
-Schedule: ${job.scheduledDate.toLocaleString()} (${job.timeSlot?.label ?? 'N/A'})
-Job: ${job.jobDescription}
+          Schedule: ${job.scheduledDate.toLocaleString()} (${job.timeSlot?.label ?? 'N/A'})
+          Job: ${job.jobDescription}
 
-— Dispatch Bros
+          — Dispatch Bros
       `.trim();
 
         const smsResult = await this.twilioUtil.sendSMS(
