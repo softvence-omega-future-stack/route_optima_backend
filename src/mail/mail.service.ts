@@ -1,4 +1,8 @@
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
@@ -18,6 +22,7 @@ export class MailService {
     });
   }
 
+  // Send password reset email
   async sendPasswordResetMail(email: string, token: string): Promise<void> {
     const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
 
@@ -33,7 +38,9 @@ export class MailService {
       this.logger.log(`✅ Password reset email sent to: ${email}`);
     } catch (error) {
       this.logger.error(`❌ Failed to send email to ${email}`, error.stack);
-      throw new InternalServerErrorException('Failed to send password reset email. Please try again later.');
+      throw new InternalServerErrorException(
+        'Failed to send password reset email. Please try again later.',
+      );
     }
   }
 
@@ -66,5 +73,75 @@ export class MailService {
       </div>
     `;
   }
-}
 
+  // Send job confirmation email to customer
+  async sendJobConfirmationEmail(
+    job: any,
+    technician: any,
+    preferences: any,
+  ): Promise<{ sent: boolean; message: string }> {
+    if (!job.customerEmail) {
+      return { sent: false, message: 'Customer email not provided' };
+    }
+
+    const mailOptions: nodemailer.SendMailOptions = {
+      from: `"Dispatch Bros" <${process.env.EMAIL_USER}>`,
+      to: job.customerEmail,
+      subject: `Your Job is Confirmed – Dispatch Bros`,
+      html: this.buildJobConfirmationTemplate(job, technician),
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+
+      return { sent: true, message: 'Email sent successfully' };
+    } catch (error) {
+      this.logger.error(`Email failed:`, error.stack);
+      return { sent: false, message: 'Email sending failed' };
+    }
+  }
+
+  private buildJobConfirmationTemplate(job: any, technician: any): string {
+    return `
+  <div style="font-family: 'Segoe UI', Roboto, Arial; background:#f5f6f7; padding:30px;">
+    <div style="max-width:650px; margin:auto; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.1);">
+
+      <div style="background:#111827; padding:22px; text-align:center;">
+        <h1 style="color:white; margin:0; font-size:24px;">Dispatch Bros</h1>
+      </div>
+
+      <div style="padding:28px;">
+        <h2 style="color:#111827; margin-bottom:12px;">Your Job is Confirmed</h2>
+        <p style="color:#4b5563; font-size:15px;">
+          Your booking has been successfully scheduled. Below are your job and technician details:
+        </p>
+
+        <div style="margin-top:20px; background:#f9fafb; padding:18px; border-radius:8px;">
+          <h3 style="margin:0 0 10px 0; color:#111827;">Job Details</h3>
+          <p style="margin:0; color:#4b5563;">
+            <strong>Customer:</strong> ${job.customerName}<br>
+            <strong>Address:</strong> ${job.serviceAddress}<br>
+            <strong>Phone:</strong> ${job.customerPhone}<br>
+           <strong>Schedule:</strong> ${job.scheduledDate.toLocaleDateString()} (${job.timeSlot?.label ?? 'N/A'})<br>
+            <strong>Description:</strong> ${job.jobDescription}
+          </p>
+        </div>
+
+        <div style="margin-top:20px; background:#eef2ff; padding:18px; border-radius:8px;">
+          <h3 style="margin:0 0 10px 0; color:#1e3a8a;">Technician Assigned</h3>
+          <p style="margin:0; color:#1e3a8a;">
+            <strong>Name:</strong> ${technician.name}<br>
+            <strong>Phone:</strong> ${technician.phone}<br>
+          </p>
+        </div>
+      </div>
+
+      <div style="background:#f3f4f6; padding:12px; text-align:center; color:#9ca3af; font-size:12px;">
+        © ${new Date().getFullYear()} Dispatch Bros. All rights reserved.
+      </div>
+
+    </div>
+  </div>
+  `;
+  }
+}
