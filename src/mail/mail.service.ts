@@ -122,7 +122,7 @@ export class MailService {
             <strong>Customer:</strong> ${job.customerName}<br>
             <strong>Address:</strong> ${job.serviceAddress}<br>
             <strong>Phone:</strong> ${job.customerPhone}<br>
-            <strong>Schedule:</strong> ${job.scheduledDate.toLocaleString()} (${job.timeSlot?.label ?? 'N/A'})<br>
+           <strong>Schedule:</strong> ${job.scheduledDate.toLocaleDateString()} (${job.timeSlot?.label ?? 'N/A'})<br>
             <strong>Description:</strong> ${job.jobDescription}
           </p>
         </div>
