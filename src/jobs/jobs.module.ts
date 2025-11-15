@@ -8,6 +8,7 @@ import { TwilioUtil } from 'src/utils/twilio.util';
 import { NotificationPreferencesSeeder } from './seed/notification-preferences.seeder';
 import { AddressParserUtil } from 'src/utils/address-parser.util';
 import { NotificationPreferencesModule } from 'src/notification-preferences/notification-preferences.module';
+import { MailService } from 'src/mail/mail.service';
 
 @Module({
   imports: [ConfigModule.forRoot(), NotificationPreferencesModule],
@@ -19,6 +20,7 @@ import { NotificationPreferencesModule } from 'src/notification-preferences/noti
     TwilioUtil,
     NotificationPreferencesSeeder,
     AddressParserUtil,
+    MailService
   ],
   exports: [JobsService],
 })

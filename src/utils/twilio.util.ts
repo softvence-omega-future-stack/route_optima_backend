@@ -13,20 +13,26 @@ export class TwilioUtil {
     this.client = twilio(accountSid, authToken);
   }
 
-  async sendSMS(to: string, message: string): Promise<boolean> {
+  async sendSMS(to: string, message: string): Promise<{ success: boolean; message: string }> {
     try {
       const from = this.configService.get<string>('TWILIO_PHONE_NUMBER');
-      await this.client.messages.create({
-        body: message,
-        from,
-        to,
-      });
 
-      this.logger.log(`SMS sent successfully to ${to}`);
-      return true;
+      await this.client.messages.create({ body: message, from, to });
+
+      this.logger.log(`✅ SMS sent successfully to ${to}`);
+
+      return {
+        success: true,
+        message: `SMS sent to ${to}`,
+      };
     } catch (error) {
-      this.logger.error(`Failed to send SMS to ${to}: ${error.message}`);
-      return false;
+      const msg = `SMS not sent to ${to}. Reason: ${error?.message ?? 'Unknown error'}`;
+      this.logger.warn(`⚠️ ${msg}`);
+
+      return {
+        success: false,
+        message: msg,
+      };
     }
   }
 }
