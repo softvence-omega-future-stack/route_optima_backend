@@ -19,7 +19,6 @@ enum UserRole {
 }
 
 enum JobStatus {
-  PENDING
   ASSIGNED
   COMPLETED
 }

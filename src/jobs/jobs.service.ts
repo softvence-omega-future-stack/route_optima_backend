@@ -71,7 +71,7 @@ export class JobsService {
           technicianId: createJobDto.technicianId,
           scheduledDate: new Date(createJobDto.scheduledDate),
           timeSlotId: createJobDto.timeSlotId,
-          status: { notIn: [JobStatus.PENDING] }
+          status: { notIn: [JobStatus.ASSIGNED] }
         },
       });
 
@@ -556,20 +556,14 @@ export class JobsService {
       // Execute all counts in parallel
       const [
         totalJobs,
-        pendingJobs,
         assignedJobs,
         completedJobs,
         totalTechnicians,
         activeTechnicians,
-        assignedThisWeek, // NEW: Assigned jobs in current week
+        assignedThisWeek, //  Assigned jobs in current week
       ] = await Promise.all([
         // Total jobs
         this.prisma.job.count({ where: dateFilter }),
-
-        // Pending jobs
-        this.prisma.job.count({
-          where: { ...dateFilter, status: JobStatus.PENDING },
-        }),
 
         // Assigned jobs
         this.prisma.job.count({
@@ -598,6 +592,8 @@ export class JobsService {
           },
         }),
       ]);
+
+    const pendingJobs = assignedJobs - completedJobs;
 
       // Calculate rates
       const assignedAndCompletedJobs = assignedJobs + completedJobs;
