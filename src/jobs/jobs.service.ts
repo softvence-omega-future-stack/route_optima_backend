@@ -223,18 +223,20 @@ export class JobsService {
           Address: ${job.serviceAddress}
           Phone: ${job.customerPhone}
 
-          Schedule: ${job.scheduledDate.toLocaleString()} (${job.timeSlot?.label ?? 'N/A'})
-          Job: ${job.jobDescription}
+          Date: ${job.scheduledDate.toISOString().split('T')[0]}
+          Time Slot: ${job.timeSlot?.label ?? 'N/A'}
+
+          Job Details: ${job.jobDescription}
 
           — Dispatch Bros
-      `.trim();
+        `.trim();
 
         const smsResult = await this.twilioUtil.sendSMS(
           technician.phone,
           message,
         );
 
-        console.log('seddddd', smsResult);
+        console.log('This is the sms result ->', smsResult);
 
         smsStatus = {
           sent: smsResult.success,
@@ -474,6 +476,16 @@ export class JobsService {
         },
         updatedJobs,
       };
+
+      // Return meaningful message when no jobs found
+      if (updatedJobs.length === 0) {
+        return sendResponse(
+          HttpStatus.OK,
+          true,
+          'No jobs found matching your criteria',
+          // paginationData,
+        );
+      }
 
       return sendResponse(
         HttpStatus.OK,
@@ -756,6 +768,97 @@ export class JobsService {
         false,
         'Failed to fetch statistics',
         null,
+      );
+    }
+  }
+
+  // Add this method to your JobsService class
+  async deleteJob(id: string) {
+    try {
+      this.logger.log(`Attempting to delete job with ID: ${id}`);
+
+      // Validate ID format
+      if (!id || id.trim() === '') {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          'Job ID is required',
+        );
+      }
+
+      // Check if job exists
+      const existingJob = await this.prisma.job.findUnique({
+        where: { id },
+        include: {
+          timeSlot: true,
+          technician: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      if (!existingJob) {
+        return sendResponse(HttpStatus.NOT_FOUND, false, 'Job not found');
+      }
+
+      // Check if job is in the past (optional business rule)
+      const now = new Date();
+      const jobDateTime = new Date(existingJob.scheduledDate);
+
+      // If you want to prevent deletion of past jobs, uncomment this:
+      // if (jobDateTime < now) {
+      //   return sendResponse(
+      //     HttpStatus.BAD_REQUEST,
+      //     false,
+      //     'Cannot delete past jobs',
+      //   );
+      // }
+
+      // Additional validation: Check if job is scheduled for today and time slot hasn't ended
+      const today = new Date().toISOString().split('T')[0];
+      const jobDate = existingJob.scheduledDate.toISOString().split('T')[0];
+      const currentTime = new Date().toTimeString().slice(0, 5);
+
+      if (jobDate === today && existingJob.timeSlot.endTime > currentTime) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          `Cannot delete job that is scheduled for today and hasn't ended yet (Time slot: ${existingJob.timeSlot.startTime}-${existingJob.timeSlot.endTime})`,
+        );
+      }
+
+      // Delete the job
+      await this.prisma.job.delete({
+        where: { id },
+      });
+
+      this.logger.log(`Job deleted successfully: ${id}`);
+
+      return sendResponse(HttpStatus.OK, true, 'Job deleted successfully');
+    } catch (error) {
+      this.logger.error(`Error deleting job ${id}:`, error);
+
+      // Handle Prisma specific errors
+      if (error.code === 'P2025') {
+        return sendResponse(HttpStatus.NOT_FOUND, false, 'Job not found');
+      }
+
+      // Handle foreign key constraint violations
+      if (error.code === 'P2003') {
+        return sendResponse(
+          HttpStatus.CONFLICT,
+          false,
+          'Cannot delete job due to existing references',
+        );
+      }
+
+      return sendResponse(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        false,
+        'Failed to delete job',
       );
     }
   }

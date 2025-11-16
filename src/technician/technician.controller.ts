@@ -1,4 +1,19 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpStatus, Param, Patch, Post, Query, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { TechnicianService } from './technician.service';
 import { CreateTechnicianDto } from './dto/create-technician.dto';
 import { sendResponse } from 'src/lib/responseHandler';
@@ -13,11 +28,9 @@ import { UserRole } from '@prisma/client';
 import { GetAllTechniciansDto } from './dto/get-all-technicians-dto';
 import { UpdateTechnicianDto } from './dto/update-technician.dto';
 
-
 @Controller('api/v1/technician')
 export class TechnicianController {
-
-  constructor(private readonly technicianService: TechnicianService) { }
+  constructor(private readonly technicianService: TechnicianService) {}
 
   @Post('add-technician')
   @UseInterceptors(
@@ -25,7 +38,8 @@ export class TechnicianController {
       storage: diskStorage({
         destination: join(__dirname, '..', '..', 'uploads'),
         filename: (req, file, cb) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
           cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
         },
       }),
@@ -38,7 +52,7 @@ export class TechnicianController {
     @Body('data') data: string,
   ) {
     try {
-      console.log(file)
+      console.log(file);
       // Parse the JSON string
       const technicianData: CreateTechnicianDto = JSON.parse(data);
 
@@ -49,7 +63,7 @@ export class TechnicianController {
       // console.log(technicianData)
       return this.technicianService.createTechnician(technicianData);
     } catch (error) {
-      console.log(error)
+      console.log(error);
       if (error instanceof SyntaxError) {
         throw new BadRequestException('Invalid JSON data provided');
       }
@@ -73,17 +87,13 @@ export class TechnicianController {
         'Technicians retrieved successfully',
         result.technicians,
         result.meta,
-        res
+        res,
       );
     } catch (error) {
       console.error('Error in getAllTechnicians:', error);
 
       if (error instanceof BadRequestException) {
-        return sendResponse(
-          HttpStatus.BAD_REQUEST,
-          false,
-          error.message,
-        );
+        return sendResponse(HttpStatus.BAD_REQUEST, false, error.message);
       }
 
       return sendResponse(
@@ -92,7 +102,7 @@ export class TechnicianController {
         'Failed to retrieve technicians',
         null,
         null,
-        res
+        res,
       );
     }
   }
@@ -100,18 +110,15 @@ export class TechnicianController {
   @Get('single/:id')
   @UseGuards(AuthGuard, RolesGuard)
   @AuthRoles(UserRole.ADMIN)
-  async getTechnicianById(
-    @Param('id') id: string,
-    @Res() res: Response,
-  ) {
+  async getTechnicianById(@Param('id') id: string, @Res() res: Response) {
     try {
       const result = await this.technicianService.getTechnicianById(id);
 
       return sendResponse(
         HttpStatus.OK,
-        true,
-        'Technician retrieved successfully',
-        result.technician,
+        result.success,
+        result.message,
+        result.data, // Changed from result.technician to result.data
         null,
         res,
       );
@@ -151,6 +158,59 @@ export class TechnicianController {
     }
   }
 
+  @Get('single/details/:id')
+  @UseGuards(AuthGuard, RolesGuard)
+  @AuthRoles(UserRole.ADMIN)
+  async getTechnicianDetailsById(
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    try {
+      const result = await this.technicianService.getTechnicianDetailsById(id);
+
+      return sendResponse(
+        HttpStatus.OK,
+        result.success,
+        result.message,
+        result.data, // Changed from result.technician to result.data
+        null,
+        res,
+      );
+    } catch (error) {
+      console.error('Error in getTechnicianById:', error);
+
+      if (error instanceof BadRequestException) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          error.message,
+          null,
+          null,
+          res,
+        );
+      }
+
+      if (error.status === 404 || error.message.includes('not found')) {
+        return sendResponse(
+          HttpStatus.NOT_FOUND,
+          false,
+          error.message || 'Technician not found',
+          null,
+          null,
+          res,
+        );
+      }
+
+      return sendResponse(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        false,
+        'Failed to retrieve technician',
+        null,
+        null,
+        res,
+      );
+    }
+  }
 
   @Patch('update-technician/:id')
   @UseInterceptors(
@@ -158,7 +218,8 @@ export class TechnicianController {
       storage: diskStorage({
         destination: join(__dirname, '..', '..', 'uploads'),
         filename: (req, file, cb) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
           cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
         },
       }),
@@ -181,7 +242,10 @@ export class TechnicianController {
         technicianData.photo = `/uploads/${file.filename}`;
       }
 
-      const result = await this.technicianService.updateTechnician(id, technicianData);
+      const result = await this.technicianService.updateTechnician(
+        id,
+        technicianData,
+      );
 
       return sendResponse(
         HttpStatus.OK,
@@ -230,21 +294,11 @@ export class TechnicianController {
   @Delete('delete-technician/:id')
   @UseGuards(AuthGuard, RolesGuard)
   @AuthRoles(UserRole.ADMIN)
-  async deleteTechnician(
-    @Param('id') id: string,
-    @Res() res: Response,
-  ) {
+  async deleteTechnician(@Param('id') id: string, @Res() res: Response) {
     try {
       const result = await this.technicianService.deleteTechnician(id);
-      
-      return sendResponse(
-        HttpStatus.OK,
-        true,
-        result.message,
-        null,
-        null,
-        res,
-      );
+
+      return sendResponse(HttpStatus.OK, true, result.message, null, null, res);
     } catch (error) {
       console.error('Error in deleteTechnician:', error);
 

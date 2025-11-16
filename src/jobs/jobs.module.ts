@@ -11,19 +11,25 @@ import { NotificationPreferencesModule } from 'src/notification-preferences/noti
 import { MailService } from 'src/mail/mail.service';
 import { JobCompletionService } from './job-completion.service';
 import { ScheduleModule } from '@nestjs/schedule';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
-  imports: [ConfigModule.forRoot(), NotificationPreferencesModule, ScheduleModule.forRoot() ],
+  imports: [
+    ConfigModule.forRoot(),
+    NotificationPreferencesModule,
+    ScheduleModule.forRoot(),
+    JwtModule,
+  ],
   controllers: [JobsController],
   providers: [
     JobsService,
-     JobCompletionService,
+    JobCompletionService,
     PrismaService,
     GeocoderUtil,
     TwilioUtil,
     NotificationPreferencesSeeder,
     AddressParserUtil,
-    MailService
+    MailService,
   ],
   exports: [JobsService],
 })

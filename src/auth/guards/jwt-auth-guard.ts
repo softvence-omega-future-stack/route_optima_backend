@@ -9,38 +9,33 @@ import { Request } from 'express';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-    constructor(private readonly jwtService: JwtService) { }
+  constructor(private jwtService: JwtService) {}
 
-    canActivate(context: ExecutionContext): boolean {
-        const request = context.switchToHttp().getRequest<Request>();
-        const token = this.extractTokenFromHeader(request) || this.extractTokenFromCookies(request);
-
-        if (!token) {
-            throw new UnauthorizedException('Token not found');
-        }
-
-        try {
-            const payload = this.jwtService.verify(token, {
-                secret: process.env.JWT_SECRET || 'default-access-secret-key',
-            });
-            request['user'] = payload;
-        } catch (err) {
-            console.error('JWT Verification Error:', err.message);
-            throw new UnauthorizedException('Invalid token');
-        }
-
-        return true;
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest();
+    const token = this.extractTokenFromHeader(request);
+    
+    if (!token) {
+      throw new UnauthorizedException();
     }
-
-    private extractTokenFromHeader(request: Request): string | undefined {
-        const authHeader = request.headers['authorization'];
-        if (!authHeader) return undefined;
-
-        const [type, token] = authHeader.split(' ');
-        return type === 'Bearer' ? token : undefined;
+    
+    try {
+      const payload = await this.jwtService.verifyAsync(token, {
+        secret: process.env.JWT_SECRET,
+      });
+      request['user'] = {
+        id: payload.sub, 
+        email: payload.email,
+        role: payload.role
+      };
+    } catch {
+      throw new UnauthorizedException();
     }
+    return true;
+  }
 
-    private extractTokenFromCookies(request: Request): string | undefined {
-        return request.cookies?.access_token;
-    }
+  private extractTokenFromHeader(request: Request): string | undefined {
+    const [type, token] = request.headers.authorization?.split(' ') ?? [];
+    return type === 'Bearer' ? token : undefined;
+  }
 }

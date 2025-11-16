@@ -14,6 +14,7 @@ import { v4 as uuid } from 'uuid';
 import { MailService } from 'src/mail/mail.service';
 import { randomBytes } from 'crypto';
 import { addMinutes } from 'date-fns';
+import { JwtPayload } from 'src/common/types/cookiesResponse.types';
 
 @Injectable()
 export class AuthService {
@@ -75,8 +76,11 @@ export class AuthService {
     if (!isPasswordValid)
       throw new UnauthorizedException('Invalid credentials');
 
-    // Clean up expired sessions and enforce session limits
-    await this.cleanupUserSessions(user.id);
+    // Clean up ONLY expired sessions, keep active ones
+    await this.cleanupExpiredSessionsOnly(user.id);
+
+    // Check session limit (allow max 100 simultaneous sessions)
+    await this.enforceSessionLimit(user.id, 100);
 
     const tokens = await this.generateTokens(user.id, user.email, user.role);
     await this.createSession(user.id, tokens.refreshToken);
@@ -87,7 +91,6 @@ export class AuthService {
       refreshToken: tokens.refreshToken,
     };
   }
-
   async getCurrentAdmin(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -100,11 +103,10 @@ export class AuthService {
     return this.excludePassword(user);
   }
 
-  // OPTIMIZED: Refresh tokens with automatic cleanup
   async refreshTokens(refreshToken: string) {
     try {
       // Verify refresh token validity
-      this.jwtService.verify(refreshToken, {
+      const payload = this.jwtService.verify(refreshToken, {
         secret:
           process.env.JWT_REFRESH_SECRET ||
           '1e7449b52f6582bc87373bf6ed8d50b58e5a59',
@@ -124,26 +126,33 @@ export class AuthService {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
-      // Generate new token pair
-      const tokens = await this.generateTokens(
-        session.user.id,
-        session.user.email,
-        session.user.role,
+      // Generate new access token payload
+      const accessTokenPayload = {
+        sub: session.user.id,
+        email: session.user.email,
+        role: session.user.role,
+      };
+
+      const accessToken = await this.jwtService.signAsync(
+        accessTokenPayload as any,
+        {
+          secret:
+            process.env.JWT_SECRET || '1e7449b52f6582bc87373bf6ed8db58e5a59',
+          expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
+        } as any,
       );
 
-      // Update session with new refresh token
+      // Update session last activity (optional)
       await this.prisma.session.update({
         where: { id: session.id },
         data: {
-          refreshToken: tokens.refreshToken,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
           updatedAt: new Date(),
         },
       });
 
       return {
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
+        accessToken,
+        refreshToken, // Return the same refresh token
       };
     } catch (error) {
       // Auto-cleanup invalid refresh tokens
@@ -152,7 +161,7 @@ export class AuthService {
     }
   }
 
-  // NEW: Cleanup specific invalid refresh token
+  //  Cleanup specific invalid refresh token
   private async cleanupInvalidRefreshToken(
     refreshToken: string,
   ): Promise<void> {
@@ -168,7 +177,7 @@ export class AuthService {
     }
   }
 
-  // OPTIMIZED: Logout with immediate cleanup
+  // Logout with immediate cleanup
   async logoutByToken(refreshToken: string) {
     if (!refreshToken) {
       throw new BadRequestException('Refresh token is required');
@@ -201,7 +210,7 @@ export class AuthService {
     }
   }
 
-  // OPTIMIZED: Create session with built-in limits
+  // Create session with built-in limits
   private async createSession(userId: string, refreshToken: string) {
     return this.prisma.session.create({
       data: {
@@ -299,19 +308,23 @@ export class AuthService {
 
   // * generate token
   private async generateTokens(userId: string, email: string, role: string) {
-    const payload = { id: userId, email, role };
+    const payload: JwtPayload = {
+      sub: userId, // Use 'sub' instead of 'id'
+      email,
+      role,
+    };
 
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: process.env.JWT_SECRET || '1e7449b52f6582bc87373bf6ed8db58e5a59',
-      expiresIn: '15m',
-    });
+      expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m',
+    } as any);
 
     const refreshToken = await this.jwtService.signAsync(payload, {
       secret:
         process.env.JWT_REFRESH_SECRET ||
         '1e7449b52f6582b7373bf6ed8d50b58e5a59',
-      expiresIn: '7d',
-    });
+      expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+    } as any);
 
     return { accessToken, refreshToken };
   }
@@ -335,17 +348,55 @@ export class AuthService {
       const payload = this.jwtService.verify(token, {
         secret: process.env.JWT_SECRET || 'default-access-secret-key',
       });
-      return payload;
+
+      // Return the payload with id mapped from sub
+      return {
+        id: payload.sub, // Map sub back to id for your application
+        email: payload.email,
+        role: payload.role,
+        iat: payload.iat,
+        exp: payload.exp,
+      };
     } catch {
       throw new UnauthorizedException('Invalid token');
     }
   }
 
-  private async cleanupUserSessions(userId: string): Promise<void> {
+  // Enforce maximum session limit per user
+  private async enforceSessionLimit(
+    userId: string,
+    maxSessions: number = 100,
+  ): Promise<void> {
+    const activeSessions = await this.prisma.session.findMany({
+      where: {
+        userId,
+        isActive: true,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // If over limit, remove oldest sessions
+    if (activeSessions.length >= maxSessions) {
+      const sessionsToDelete = activeSessions.slice(
+        0,
+        activeSessions.length - maxSessions + 1,
+      );
+
+      await this.prisma.session.deleteMany({
+        where: {
+          id: { in: sessionsToDelete.map((s) => s.id) },
+        },
+      });
+    }
+  }
+
+  // Clean up ONLY expired sessions (keep active ones) - ADD THIS METHOD
+  private async cleanupExpiredSessionsOnly(userId: string): Promise<void> {
     await this.prisma.session.deleteMany({
       where: {
         userId,
-        OR: [{ isActive: false }, { expiresAt: { lt: new Date() } }],
+        expiresAt: { lt: new Date() }, // Only delete expired, keep active
       },
     });
   }
