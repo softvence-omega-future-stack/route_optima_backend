@@ -55,9 +55,9 @@ export class GetJobsDto {
   scheduledDate?: string;
 
   @IsOptional()
-  @IsEnum(JobStatus)
+  @IsEnum(JobStatus, { message: 'Status must be either ASSIGNED or COMPLETED' })
   status?: JobStatus;
-
+  
   @IsOptional()
   @Type(() => Number)
   @IsInt()

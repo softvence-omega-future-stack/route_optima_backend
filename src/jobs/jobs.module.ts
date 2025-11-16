@@ -9,12 +9,15 @@ import { NotificationPreferencesSeeder } from './seed/notification-preferences.s
 import { AddressParserUtil } from 'src/utils/address-parser.util';
 import { NotificationPreferencesModule } from 'src/notification-preferences/notification-preferences.module';
 import { MailService } from 'src/mail/mail.service';
+import { JobCompletionService } from './job-completion.service';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
-  imports: [ConfigModule.forRoot(), NotificationPreferencesModule],
+  imports: [ConfigModule.forRoot(), NotificationPreferencesModule, ScheduleModule.forRoot() ],
   controllers: [JobsController],
   providers: [
     JobsService,
+     JobCompletionService,
     PrismaService,
     GeocoderUtil,
     TwilioUtil,

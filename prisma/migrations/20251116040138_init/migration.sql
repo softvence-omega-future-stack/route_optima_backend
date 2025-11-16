@@ -2,7 +2,7 @@
 CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'TECHNICIAN');
 
 -- CreateEnum
-CREATE TYPE "JobStatus" AS ENUM ('PENDING', 'ASSIGNED', 'COMPLETED');
+CREATE TYPE "JobStatus" AS ENUM ('ASSIGNED', 'COMPLETED');
 
 -- CreateTable
 CREATE TABLE "User" (
@@ -49,7 +49,7 @@ CREATE TABLE "Technician" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "phone" TEXT NOT NULL,
-    "region" TEXT,
+    "address" TEXT,
     "photo" TEXT,
     "workStartTime" TEXT,
     "workEndTime" TEXT,
@@ -61,39 +61,53 @@ CREATE TABLE "Technician" (
 );
 
 -- CreateTable
-CREATE TABLE "TimeSlot" (
+CREATE TABLE "DefaultTimeSlot" (
     "id" TEXT NOT NULL,
     "label" TEXT NOT NULL,
-    "startTime" TIMESTAMP(3) NOT NULL,
-    "endTime" TIMESTAMP(3) NOT NULL,
-    "date" TIMESTAMP(3) NOT NULL,
-    "technicianId" TEXT NOT NULL,
-    "isBooked" BOOLEAN NOT NULL DEFAULT false,
+    "startTime" TEXT NOT NULL,
+    "endTime" TEXT NOT NULL,
+    "order" SERIAL NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "TimeSlot_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "DefaultTimeSlot_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
 CREATE TABLE "Job" (
     "id" TEXT NOT NULL,
     "customerName" TEXT NOT NULL,
-    "customerPhone" TEXT,
+    "customerPhone" TEXT NOT NULL,
     "customerEmail" TEXT,
-    "jobDescription" TEXT,
     "serviceAddress" TEXT NOT NULL,
     "zipCode" TEXT,
+    "street" TEXT,
+    "city" TEXT,
+    "state" TEXT,
+    "stateCode" TEXT,
     "latitude" DOUBLE PRECISION,
     "longitude" DOUBLE PRECISION,
-    "state" TEXT,
+    "jobDescription" TEXT NOT NULL,
     "scheduledDate" TIMESTAMP(3) NOT NULL,
     "timeSlotId" TEXT NOT NULL,
     "technicianId" TEXT NOT NULL,
-    "status" "JobStatus" NOT NULL DEFAULT 'PENDING',
+    "status" "JobStatus" NOT NULL DEFAULT 'ASSIGNED',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Job_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "NotificationPreferences" (
+    "id" TEXT NOT NULL DEFAULT 'singleton',
+    "sendCustomerEmail" BOOLEAN NOT NULL DEFAULT true,
+    "sendTechnicianSMS" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "NotificationPreferences_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -108,6 +122,9 @@ CREATE UNIQUE INDEX "PasswordResetToken_token_key" ON "PasswordResetToken"("toke
 -- CreateIndex
 CREATE UNIQUE INDEX "Technician_phone_key" ON "Technician"("phone");
 
+-- CreateIndex
+CREATE INDEX "DefaultTimeSlot_isActive_order_idx" ON "DefaultTimeSlot"("isActive", "order");
+
 -- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_technicianId_fkey" FOREIGN KEY ("technicianId") REFERENCES "Technician"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
@@ -118,10 +135,7 @@ ALTER TABLE "Session" ADD CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId"
 ALTER TABLE "PasswordResetToken" ADD CONSTRAINT "PasswordResetToken_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "TimeSlot" ADD CONSTRAINT "TimeSlot_technicianId_fkey" FOREIGN KEY ("technicianId") REFERENCES "Technician"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Job" ADD CONSTRAINT "Job_timeSlotId_fkey" FOREIGN KEY ("timeSlotId") REFERENCES "DefaultTimeSlot"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Job" ADD CONSTRAINT "Job_timeSlotId_fkey" FOREIGN KEY ("timeSlotId") REFERENCES "TimeSlot"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Job" ADD CONSTRAINT "Job_technicianId_fkey" FOREIGN KEY ("technicianId") REFERENCES "Technician"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Job" ADD CONSTRAINT "Job_technicianId_fkey" FOREIGN KEY ("technicianId") REFERENCES "Technician"("id") ON DELETE CASCADE ON UPDATE CASCADE;

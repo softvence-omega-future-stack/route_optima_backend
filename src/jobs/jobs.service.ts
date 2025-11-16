@@ -25,6 +25,21 @@ export class JobsService {
     private mailService: MailService,
   ) {}
 
+  private timeToMinutes(timeString: string): number {
+    const [hours, minutes] = timeString.split(':').map(Number);
+    return hours * 60 + minutes;
+  }
+
+  private shouldAutoCompleteJob(job: any): boolean {
+    const now = new Date();
+    const currentTime = now.toTimeString().slice(0, 5);
+    const currentDate = now.toISOString().split('T')[0];
+    const jobDate = job.scheduledDate.toISOString().split('T')[0];
+
+    // Check if job date is today or in past AND time slot has ended
+    return jobDate <= currentDate && job.timeSlot.endTime < currentTime;
+  }
+
   async createJob(createJobDto: CreateJobDto) {
     try {
       this.logger.log('Creating new job...');
@@ -104,7 +119,7 @@ export class JobsService {
           technicianId: createJobDto.technicianId,
           scheduledDate: new Date(createJobDto.scheduledDate),
           timeSlotId: createJobDto.timeSlotId,
-          status: { notIn: [JobStatus.ASSIGNED] },
+          status: JobStatus.ASSIGNED,
         },
       });
 
@@ -329,9 +344,15 @@ export class JobsService {
         };
       }
 
-      // Filter by status
-      if (status) {
+      // Filter by status - only allow valid JobStatus values
+      if (
+        status &&
+        (status === JobStatus.ASSIGNED || status === JobStatus.COMPLETED)
+      ) {
         where.status = status;
+      } else if (status) {
+        // Log warning but don't apply invalid status filter
+        this.logger.warn(`Invalid status filter ignored: ${status}`);
       }
 
       // Filter by createdAt date
@@ -405,6 +426,38 @@ export class JobsService {
         },
       });
 
+      // AUTO-COMPLETE: Update jobs that have expired time slots
+      const updatedJobs = await Promise.all(
+        jobs.map(async (job) => {
+          if (
+            job.status === JobStatus.ASSIGNED &&
+            this.shouldAutoCompleteJob(job)
+          ) {
+            return await this.prisma.job.update({
+              where: { id: job.id },
+              data: {
+                status: JobStatus.COMPLETED,
+                updatedAt: new Date(),
+              },
+              include: {
+                timeSlot: true,
+                technician: {
+                  select: {
+                    id: true,
+                    name: true,
+                    phone: true,
+                    photo: true,
+                    address: true,
+                    isActive: true,
+                  },
+                },
+              },
+            });
+          }
+          return job;
+        }),
+      );
+
       // Calculate pagination metadata
       const totalPages = Math.ceil(totalCount / limit);
       const hasNextPage = page < totalPages;
@@ -419,7 +472,7 @@ export class JobsService {
           hasNextPage,
           hasPrevPage,
         },
-        jobs,
+        updatedJobs,
       };
 
       return sendResponse(
@@ -464,7 +517,42 @@ export class JobsService {
         return sendResponse(HttpStatus.NOT_FOUND, false, 'Job not found', null);
       }
 
-      return sendResponse(HttpStatus.OK, true, 'Job fetched successfully', job);
+      // AUTO-COMPLETE: Update job if time slot has ended
+      let updatedJob = job;
+      if (
+        job.status === JobStatus.ASSIGNED &&
+        this.shouldAutoCompleteJob(job)
+      ) {
+        updatedJob = await this.prisma.job.update({
+          where: { id },
+          data: {
+            status: JobStatus.COMPLETED,
+            updatedAt: new Date(),
+          },
+          include: {
+            timeSlot: true,
+            technician: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+                photo: true,
+                address: true,
+                workStartTime: true,
+                workEndTime: true,
+                isActive: true,
+              },
+            },
+          },
+        });
+      }
+
+      return sendResponse(
+        HttpStatus.OK,
+        true,
+        'Job fetched successfully',
+        updatedJob,
+      );
     } catch (error) {
       this.logger.error('Error fetching job:', error);
       return sendResponse(
@@ -670,10 +758,5 @@ export class JobsService {
         null,
       );
     }
-  }
-
-  private timeToMinutes(timeString: string): number {
-    const [hours, minutes] = timeString.split(':').map(Number);
-    return hours * 60 + minutes;
   }
 }
