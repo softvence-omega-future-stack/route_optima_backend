@@ -223,11 +223,13 @@ export class JobsService {
           Address: ${job.serviceAddress}
           Phone: ${job.customerPhone}
 
-          Schedule: ${job.scheduledDate.toLocaleString()} (${job.timeSlot?.label ?? 'N/A'})
-          Job: ${job.jobDescription}
+          Date: ${job.scheduledDate.toLocaleDateString()}
+          Time Slot: ${job.timeSlot?.label ?? 'N/A'}
+
+          Job Details: ${job.jobDescription}
 
           — Dispatch Bros
-      `.trim();
+        `.trim();
 
         const smsResult = await this.twilioUtil.sendSMS(
           technician.phone,
