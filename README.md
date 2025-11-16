@@ -1,98 +1,119 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# RouteOptima (Dispatch Bros) - Field Service Management System
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A comprehensive backend API for managing field service operations, technician scheduling, and customer job assignments.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## 🚀 Features
 
-## Description
+### 🔐 Authentication & Authorization
+- **JWT-based Authentication** with access and refresh tokens
+- **Role-based Access Control** (Admin roles)
+- **Secure Password Reset** with email verification
+- **Session Management** with token blacklisting
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+### 👥 User Management
+- **Admin Dashboard** with full system access
+- **Technician Profiles** with working hours and availability
+- **User Registration & Login** with validation
+- **Photo Upload** support
+- **Active/Inactive Status** management
 
-## Project setup
+### 📋 Job Management
+- **Job Creation & Assignment** to technicians
+- **Real-time Job Status** tracking (Assigned/Completed)
+- **Auto-completion** of expired jobs
+- **Advanced Job Filtering** by date, status, location, technician
+- **Conflict Detection** for double-booking prevention
+- **Geocoding Integration** for address validation
 
-```bash
-$ npm install
-```
+### ⏰ Time Slot Management
+- **Flexible Time Slots** with custom labels
+- **Working Hours Validation** against technician availability
+- **Time Zone Handling** with UTC storage
+- **Overlap Prevention** for scheduling conflicts
+- **Dynamic Time Slot Creation** with auto-ordering
 
-## Compile and run the project
+### 📍 Location Services
+- **Address Parsing** with street, city, state extraction
+- **Google Maps Integration** for geocoding
+- **Latitude/Longitude Storage** for route optimization
+- **Service Area Management** by zip code and state
 
-```bash
-# development
-$ npm run start
+### 📧 Notification System
+- **Email Notifications** for job confirmations
+- **SMS Notifications** via Twilio integration
+- **Customizable Preferences** for notification types
+- **Template-based Messaging** with job details
+- **Multi-channel Communication** (Email + SMS)
 
-# watch mode
-$ npm run start:dev
+### 📊 Analytics & Reporting
+- **Job Statistics** with completion rates
+- **Technician Performance** metrics
+- **Weekly/Monthly Reports** with date filtering
+- **Efficiency Tracking** and KPI monitoring
+- **Real-time Dashboard** data
 
-# production mode
-$ npm run start:prod
-```
+### 🔧 Technical Features
+- **RESTful API** with comprehensive endpoints
+- **Database Migrations** with Prisma ORM
+- **Input Validation** with class-validator
+- **Error Handling** with structured responses
+- **Logging System** with Winston integration
+- **CORS Configuration** for frontend integration
 
-## Run tests
+## 🛠 Tech Stack
 
-```bash
-# unit tests
-$ npm run test
+- **Runtime**: Node.js with TypeScript
+- **Framework**: NestJS
+- **Database**: PostgreSQL with Prisma ORM
+- **Authentication**: JWT with bcrypt
+- **Email**: Nodemailer with Gmail SMTP
+- **SMS**: Twilio API
+- **Maps**: Google Geocoding API
+- **Validation**: class-validator & class-transformer
 
-# e2e tests
-$ npm run test:e2e
 
-# test coverage
-$ npm run test:cov
-```
+## 🔒 Security Features
 
-## Deployment
+- **Password Hashing** with bcrypt
+- **JWT Token Validation** on protected routes
+- **Role-based Authorization** for admin functions
+- **Input Sanitization** and validation
+- **CORS Protection** with whitelist
+- **Rate Limiting** on authentication endpoints
+- **Secure Cookie Settings** with httpOnly flags
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## 📱 Notification System
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Email Notifications
+- Job confirmation emails to customers
+- Professional HTML templates
+- Automatic sending based on preferences
+- Error handling and retry logic
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+### SMS Notifications
+- Real-time job assignments to technicians
+- Formatted messages with job details
+- Twilio integration with delivery tracking
+- Preference-based sending
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## 🌍 Timezone Handling
 
-## Resources
+- **UTC Storage** for all timestamps
+- **Local Time Display** in notifications
+- **Timezone-aware** scheduling logic
+- **DST Compatibility** for US regions
 
-Check out a few resources that may come in handy when working with NestJS:
+## 📊 Database Schema
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### Key Models
+- **User**: Authentication and profile data
+- **Technician**: Field worker profiles and schedules
+- **Job**: Service appointments and assignments
+- **DefaultTimeSlot**: Available scheduling windows
+- **Session**: Token management and security
+- **NotificationPreferences**: Communication settings
 
-## Support
+---
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
 
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+**Dispatch Bros** - Streamlining field service operations with modern technology.
