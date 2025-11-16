@@ -190,14 +190,14 @@ export class TechnicianService {
       const todayEnd = new Date();
       todayEnd.setHours(23, 59, 59, 999);
 
-      // Get today's job statistics for each technician
+      // Get job statistics for each technician
       const techniciansWithStats = await Promise.all(
         technicians.map(async (technician) => {
           // Get today's assigned jobs count
           const todayAssigned = await this.prisma.job.count({
             where: {
               technicianId: technician.id,
-              createdAt: {
+              scheduledDate: {
                 gte: todayStart,
                 lt: todayEnd,
               },
@@ -219,8 +219,27 @@ export class TechnicianService {
             },
           });
 
+          // Get total overall assigned jobs count (all time)
+          const totalAssigned = await this.prisma.job.count({
+            where: {
+              technicianId: technician.id,
+              status: {
+                in: [JobStatus.ASSIGNED, JobStatus.COMPLETED],
+              },
+            },
+          });
+
+          // Get total overall completed jobs count (all time)
+          const totalCompleted = await this.prisma.job.count({
+            where: {
+              technicianId: technician.id,
+              status: JobStatus.COMPLETED,
+            },
+          });
+
           // Calculate pending jobs based on formula
           const todayPending = todayAssigned - todayCompleted;
+          const totalPending = totalAssigned - totalCompleted;
 
           return {
             ...technician,
@@ -228,6 +247,15 @@ export class TechnicianService {
               assigned: todayAssigned,
               completed: todayCompleted,
               pending: todayPending,
+            },
+            overallStats: {
+              assigned: totalAssigned,
+              completed: totalCompleted,
+              pending: totalPending,
+              completionRate:
+                totalAssigned > 0
+                  ? Number(((totalCompleted / totalAssigned) * 100).toFixed(2))
+                  : 0,
             },
           };
         }),
@@ -274,7 +302,7 @@ export class TechnicianService {
 
   async getTechnicianById(id: string) {
     try {
-      // Validate ID format (optional, but good practice)
+      // Validate ID format
       if (!id || id.trim() === '') {
         throw new BadRequestException('Invalid technician ID');
       }
@@ -306,64 +334,55 @@ export class TechnicianService {
       const todayEnd = new Date();
       todayEnd.setHours(23, 59, 59, 999);
 
-      // Get today's job statistics for the technician
-      const [
-        todayAssigned,
-        todayCompleted,
-        todayPending,
-        totalAssigned,
-        totalCompleted,
-      ] = await Promise.all([
-        // Today's assigned jobs count
-        this.prisma.job.count({
-          where: {
-            technicianId: technician.id,
-            createdAt: {
-              gte: todayStart,
-              lt: todayEnd,
+      // Get job statistics for the technician
+      const [todayAssigned, todayCompleted, totalAssigned, totalCompleted] =
+        await Promise.all([
+          // Today's assigned jobs count (scheduled jobs for today)
+          this.prisma.job.count({
+            where: {
+              technicianId: technician.id,
+              scheduledDate: {
+                gte: todayStart,
+                lt: todayEnd,
+              },
+              status: {
+                in: [JobStatus.ASSIGNED, JobStatus.COMPLETED],
+              },
             },
-            status: {
-              in: [JobStatus.ASSIGNED, JobStatus.COMPLETED],
+          }),
+
+          // Today's completed jobs count
+          this.prisma.job.count({
+            where: {
+              technicianId: technician.id,
+              updatedAt: {
+                gte: todayStart,
+                lt: todayEnd,
+              },
+              status: JobStatus.COMPLETED,
             },
-          },
-        }),
+          }),
 
-        // Today's completed jobs count
-        this.prisma.job.count({
-          where: {
-            technicianId: technician.id,
-            updatedAt: {
-              gte: todayStart,
-              lt: todayEnd,
+          // Total assigned jobs (all time - ASSIGNED + COMPLETED)
+          this.prisma.job.count({
+            where: {
+              technicianId: technician.id,
+              status: { in: [JobStatus.ASSIGNED, JobStatus.COMPLETED] },
             },
-            status: JobStatus.COMPLETED,
-          },
-        }),
+          }),
 
-        // Total assigned (Assigned + Completed)
-        this.prisma.job.count({
-          where: {
-            technicianId: technician.id,
-            status: { in: [JobStatus.ASSIGNED, JobStatus.COMPLETED] },
-          },
-        }),
+          // Total completed jobs (all time)
+          this.prisma.job.count({
+            where: {
+              technicianId: technician.id,
+              status: JobStatus.COMPLETED,
+            },
+          }),
+        ]);
 
-        // Total completed (all time)
-        this.prisma.job.count({
-          where: {
-            technicianId: technician.id,
-            status: JobStatus.COMPLETED,
-          },
-        }),
-
-        // Total completed jobs (all time)
-        this.prisma.job.count({
-          where: {
-            technicianId: technician.id,
-            status: JobStatus.COMPLETED,
-          },
-        }),
-      ]);
+      // Calculate pending jobs
+      const todayPending = todayAssigned - todayCompleted;
+      const totalPending = totalAssigned - totalCompleted;
 
       // Add statistics to technician response
       const technicianWithStats = {
@@ -375,8 +394,9 @@ export class TechnicianService {
             pending: todayPending,
           },
           overall: {
-            totalAssigned,
-            totalCompleted,
+            totalAssigned: totalAssigned,
+            totalCompleted: totalCompleted,
+            totalPending: totalPending,
             completionRate:
               totalAssigned > 0
                 ? Number(((totalCompleted / totalAssigned) * 100).toFixed(2))
@@ -386,8 +406,9 @@ export class TechnicianService {
       };
 
       return {
+        success: true,
         message: 'Technician retrieved successfully',
-        technician: technicianWithStats,
+        data: technicianWithStats,
       };
     } catch (error) {
       // Handle known Prisma errors
@@ -419,6 +440,262 @@ export class TechnicianService {
       throw new InternalServerErrorException('Failed to retrieve technician');
     }
   }
+
+  async getTechnicianDetailsById(id: string) {
+  try {
+    // Validate ID format
+    if (!id || id.trim() === '') {
+      throw new BadRequestException('Invalid technician ID');
+    }
+
+    const technician = await this.prisma.technician.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        address: true,
+        workStartTime: true,
+        workEndTime: true,
+        photo: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!technician) {
+      throw new NotFoundException(`Technician with ID ${id} not found`);
+    }
+
+    // Get today's date range for job statistics
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    // Get job statistics and details for the technician
+    const [
+      todayAssigned,
+      todayCompleted,
+      totalAssigned,
+      totalCompleted,
+      todayJobs,
+      recentJobs,
+      upcomingJobs
+    ] = await Promise.all([
+      // Today's assigned jobs count (scheduled jobs for today)
+      this.prisma.job.count({
+        where: {
+          technicianId: technician.id,
+          scheduledDate: {
+            gte: todayStart,
+            lt: todayEnd,
+          },
+          status: {
+            in: [JobStatus.ASSIGNED, JobStatus.COMPLETED],
+          },
+        },
+      }),
+
+      // Today's completed jobs count
+      this.prisma.job.count({
+        where: {
+          technicianId: technician.id,
+          updatedAt: {
+            gte: todayStart,
+            lt: todayEnd,
+          },
+          status: JobStatus.COMPLETED,
+        },
+      }),
+
+      // Total assigned jobs (all time - ASSIGNED + COMPLETED)
+      this.prisma.job.count({
+        where: {
+          technicianId: technician.id,
+          status: { in: [JobStatus.ASSIGNED, JobStatus.COMPLETED] },
+        },
+      }),
+
+      // Total completed jobs (all time)
+      this.prisma.job.count({
+        where: {
+          technicianId: technician.id,
+          status: JobStatus.COMPLETED,
+        },
+      }),
+
+      // Today's jobs with details
+      this.prisma.job.findMany({
+        where: {
+          technicianId: technician.id,
+          scheduledDate: {
+            gte: todayStart,
+            lt: todayEnd,
+          },
+          status: {
+            in: [JobStatus.ASSIGNED, JobStatus.COMPLETED],
+          },
+        },
+        select: {
+          id: true,
+          customerName: true,
+          customerPhone: true,
+          serviceAddress: true,
+          scheduledDate: true,
+          status: true,
+          jobDescription: true,
+          createdAt: true,
+          updatedAt: true,
+          timeSlot: {
+            select: {
+              startTime: true,
+              endTime: true,
+            },
+          },
+        },
+        orderBy: {
+          scheduledDate: 'asc',
+        },
+      }),
+
+      // Recent completed jobs (last 5)
+      this.prisma.job.findMany({
+        where: {
+          technicianId: technician.id,
+          status: JobStatus.COMPLETED,
+        },
+        select: {
+          id: true,
+          customerName: true,
+          customerPhone: true,
+          serviceAddress: true,
+          scheduledDate: true,
+          status: true,
+          jobDescription: true,
+          updatedAt: true,
+          createdAt: true,
+          timeSlot: {
+            select: {
+              startTime: true,
+              endTime: true,
+            },
+          },
+        },
+        orderBy: {
+          updatedAt: 'desc',
+        },
+        take: 5,
+      }),
+
+      // Upcoming assigned jobs (next 5)
+      this.prisma.job.findMany({
+        where: {
+          technicianId: technician.id,
+          status: JobStatus.ASSIGNED,
+          scheduledDate: {
+            gte: todayStart,
+          },
+        },
+        select: {
+          id: true,
+          customerName: true,
+          customerPhone: true,
+          serviceAddress: true,
+          scheduledDate: true,
+          status: true,
+          jobDescription: true,
+          createdAt: true,
+          timeSlot: {
+            select: {
+              startTime: true,
+              endTime: true,
+            },
+          },
+        },
+        orderBy: {
+          scheduledDate: 'asc',
+        },
+        take: 5,
+      }),
+    ]);
+
+    // Calculate pending jobs
+    const todayPending = todayAssigned - todayCompleted;
+    const totalPending = totalAssigned - totalCompleted;
+
+    // Add statistics and job details to technician response
+    const technicianWithStats = {
+      ...technician,
+      stats: {
+        today: {
+          assigned: todayAssigned,
+          completed: todayCompleted,
+          pending: todayPending,
+        },
+        overall: {
+          totalAssigned: totalAssigned,
+          totalCompleted: totalCompleted,
+          totalPending: totalPending,
+          completionRate:
+            totalAssigned > 0
+              ? Number(((totalCompleted / totalAssigned) * 100).toFixed(2))
+              : 0,
+        },
+      },
+      jobDetails: {
+        todayJobs: {
+          count: todayJobs.length,
+          jobs: todayJobs,
+        },
+        recentCompleted: {
+          count: recentJobs.length,
+          jobs: recentJobs,
+        },
+        upcomingJobs: {
+          count: upcomingJobs.length,
+          jobs: upcomingJobs,
+        },
+      },
+    };
+
+    return {
+      success: true,
+      message: 'Technician retrieved successfully',
+      data: technicianWithStats,
+    };
+  } catch (error) {
+    // Handle known Prisma errors
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      switch (error.code) {
+        case 'P2025':
+          throw new NotFoundException(`Technician with ID ${id} not found`);
+        default:
+          console.error('Prisma error in getTechnicianById:', error);
+          throw new InternalServerErrorException('Database query failed');
+      }
+    }
+
+    // Handle NestJS HTTP exceptions
+    if (
+      error instanceof BadRequestException ||
+      error instanceof NotFoundException
+    ) {
+      throw error;
+    }
+
+    // Handle validation errors
+    if (error instanceof Prisma.PrismaClientValidationError) {
+      throw new BadRequestException('Invalid technician ID format');
+    }
+
+    // Handle unknown errors
+    console.error('Unexpected error in getTechnicianById:', error);
+    throw new InternalServerErrorException('Failed to retrieve technician');
+  }
+}
 
   async updateTechnician(id: string, dto: UpdateTechnicianDto) {
     try {
