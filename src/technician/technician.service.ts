@@ -202,11 +202,7 @@ export class TechnicianService {
                 lt: todayEnd,
               },
               status: {
-                in: [
-                  JobStatus.ASSIGNED,
-                  JobStatus.PENDING,
-                  JobStatus.COMPLETED,
-                ],
+                in: [JobStatus.ASSIGNED, JobStatus.COMPLETED],
               },
             },
           });
@@ -223,17 +219,8 @@ export class TechnicianService {
             },
           });
 
-          // Get today's pending jobs count
-          const todayPending = await this.prisma.job.count({
-            where: {
-              technicianId: technician.id,
-              status: JobStatus.PENDING,
-              scheduledDate: {
-                gte: todayStart,
-                lt: todayEnd,
-              },
-            },
-          });
+          // Calculate pending jobs based on formula
+          const todayPending = todayAssigned - todayCompleted;
 
           return {
             ...technician,
@@ -286,156 +273,152 @@ export class TechnicianService {
   }
 
   async getTechnicianById(id: string) {
-  try {
-    // Validate ID format (optional, but good practice)
-    if (!id || id.trim() === '') {
-      throw new BadRequestException('Invalid technician ID');
-    }
+    try {
+      // Validate ID format (optional, but good practice)
+      if (!id || id.trim() === '') {
+        throw new BadRequestException('Invalid technician ID');
+      }
 
-    const technician = await this.prisma.technician.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        phone: true,
-        address: true,
-        workStartTime: true,
-        workEndTime: true,
-        photo: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+      const technician = await this.prisma.technician.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          address: true,
+          workStartTime: true,
+          workEndTime: true,
+          photo: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
 
-    if (!technician) {
-      throw new NotFoundException(`Technician with ID ${id} not found`);
-    }
+      if (!technician) {
+        throw new NotFoundException(`Technician with ID ${id} not found`);
+      }
 
-    // Get today's date range for job statistics
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+      // Get today's date range for job statistics
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
 
-    // Get today's job statistics for the technician
-    const [
-      todayAssigned,
-      todayCompleted,
-      todayPending,
-      totalAssigned,
-      totalCompleted
-    ] = await Promise.all([
-      // Today's assigned jobs count
-      this.prisma.job.count({
-        where: {
-          technicianId: technician.id,
-          createdAt: {
-            gte: todayStart,
-            lt: todayEnd,
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+
+      // Get today's job statistics for the technician
+      const [
+        todayAssigned,
+        todayCompleted,
+        todayPending,
+        totalAssigned,
+        totalCompleted,
+      ] = await Promise.all([
+        // Today's assigned jobs count
+        this.prisma.job.count({
+          where: {
+            technicianId: technician.id,
+            createdAt: {
+              gte: todayStart,
+              lt: todayEnd,
+            },
+            status: {
+              in: [JobStatus.ASSIGNED, JobStatus.COMPLETED],
+            },
           },
-          status: {
-            in: [JobStatus.ASSIGNED, JobStatus.PENDING, JobStatus.COMPLETED]
-          }
-        },
-      }),
+        }),
 
-      // Today's completed jobs count
-      this.prisma.job.count({
-        where: {
-          technicianId: technician.id,
-          updatedAt: {
-            gte: todayStart,
-            lt: todayEnd,
+        // Today's completed jobs count
+        this.prisma.job.count({
+          where: {
+            technicianId: technician.id,
+            updatedAt: {
+              gte: todayStart,
+              lt: todayEnd,
+            },
+            status: JobStatus.COMPLETED,
           },
-          status: JobStatus.COMPLETED,
-        },
-      }),
+        }),
 
-      // Today's pending jobs count
-      this.prisma.job.count({
-        where: {
-          technicianId: technician.id,
-          status: JobStatus.PENDING,
-          scheduledDate: {
-            gte: todayStart,
-            lt: todayEnd,
+        // Total assigned (Assigned + Completed)
+        this.prisma.job.count({
+          where: {
+            technicianId: technician.id,
+            status: { in: [JobStatus.ASSIGNED, JobStatus.COMPLETED] },
+          },
+        }),
+
+        // Total completed (all time)
+        this.prisma.job.count({
+          where: {
+            technicianId: technician.id,
+            status: JobStatus.COMPLETED,
+          },
+        }),
+
+        // Total completed jobs (all time)
+        this.prisma.job.count({
+          where: {
+            technicianId: technician.id,
+            status: JobStatus.COMPLETED,
+          },
+        }),
+      ]);
+
+      // Add statistics to technician response
+      const technicianWithStats = {
+        ...technician,
+        stats: {
+          today: {
+            assigned: todayAssigned,
+            completed: todayCompleted,
+            pending: todayPending,
+          },
+          overall: {
+            totalAssigned,
+            totalCompleted,
+            completionRate:
+              totalAssigned > 0
+                ? Number(((totalCompleted / totalAssigned) * 100).toFixed(2))
+                : 0,
           },
         },
-      }),
+      };
 
-      // Total assigned jobs (all time)
-      this.prisma.job.count({
-        where: {
-          technicianId: technician.id,
-          status: {
-            in: [JobStatus.ASSIGNED, JobStatus.PENDING, JobStatus.COMPLETED]
-          }
-        },
-      }),
-
-      // Total completed jobs (all time)
-      this.prisma.job.count({
-        where: {
-          technicianId: technician.id,
-          status: JobStatus.COMPLETED,
-        },
-      })
-    ]);
-
-    // Add statistics to technician response
-    const technicianWithStats = {
-      ...technician,
-      stats: {
-        today: {
-          assigned: todayAssigned,
-          completed: todayCompleted,
-          pending: todayPending,
-        },
-        overall: {
-          totalAssigned,
-          totalCompleted,
-          completionRate: totalAssigned > 0 ? 
-            Number(((totalCompleted / totalAssigned) * 100).toFixed(2)) : 0,
+      return {
+        message: 'Technician retrieved successfully',
+        technician: technicianWithStats,
+      };
+    } catch (error) {
+      // Handle known Prisma errors
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        switch (error.code) {
+          case 'P2025':
+            throw new NotFoundException(`Technician with ID ${id} not found`);
+          default:
+            console.error('Prisma error in getTechnicianById:', error);
+            throw new InternalServerErrorException('Database query failed');
         }
       }
-    };
 
-    return {
-      message: 'Technician retrieved successfully',
-      technician: technicianWithStats,
-    };
-  } catch (error) {
-    // Handle known Prisma errors
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      switch (error.code) {
-        case 'P2025':
-          throw new NotFoundException(`Technician with ID ${id} not found`);
-        default:
-          console.error('Prisma error in getTechnicianById:', error);
-          throw new InternalServerErrorException('Database query failed');
+      // Handle NestJS HTTP exceptions
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
       }
-    }
 
-    // Handle NestJS HTTP exceptions
-    if (
-      error instanceof BadRequestException ||
-      error instanceof NotFoundException
-    ) {
-      throw error;
-    }
+      // Handle validation errors
+      if (error instanceof Prisma.PrismaClientValidationError) {
+        throw new BadRequestException('Invalid technician ID format');
+      }
 
-    // Handle validation errors
-    if (error instanceof Prisma.PrismaClientValidationError) {
-      throw new BadRequestException('Invalid technician ID format');
+      // Handle unknown errors
+      console.error('Unexpected error in getTechnicianById:', error);
+      throw new InternalServerErrorException('Failed to retrieve technician');
     }
-
-    // Handle unknown errors
-    console.error('Unexpected error in getTechnicianById:', error);
-    throw new InternalServerErrorException('Failed to retrieve technician');
   }
-}
 
   async updateTechnician(id: string, dto: UpdateTechnicianDto) {
     try {

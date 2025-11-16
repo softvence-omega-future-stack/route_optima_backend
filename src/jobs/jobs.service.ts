@@ -25,6 +25,21 @@ export class JobsService {
     private mailService: MailService,
   ) {}
 
+  private timeToMinutes(timeString: string): number {
+    const [hours, minutes] = timeString.split(':').map(Number);
+    return hours * 60 + minutes;
+  }
+
+  private shouldAutoCompleteJob(job: any): boolean {
+    const now = new Date();
+    const currentTime = now.toTimeString().slice(0, 5);
+    const currentDate = now.toISOString().split('T')[0];
+    const jobDate = job.scheduledDate.toISOString().split('T')[0];
+
+    // Check if job date is today or in past AND time slot has ended
+    return jobDate <= currentDate && job.timeSlot.endTime < currentTime;
+  }
+
   async createJob(createJobDto: CreateJobDto) {
     try {
       this.logger.log('Creating new job...');
@@ -66,12 +81,45 @@ export class JobsService {
         );
       }
 
+      // technician working hours check
+      if (technician.workStartTime && technician.workEndTime) {
+        const timeSlot = await this.prisma.defaultTimeSlot.findUnique({
+          where: { id: createJobDto.timeSlotId },
+        });
+
+        if (!timeSlot) {
+          return sendResponse(
+            HttpStatus.NOT_FOUND,
+            false,
+            'Time slot not found',
+          );
+        }
+
+        // Convert times to minutes for comparison
+        const workStartMinutes = this.timeToMinutes(technician.workStartTime);
+        const workEndMinutes = this.timeToMinutes(technician.workEndTime);
+        const slotStartMinutes = this.timeToMinutes(timeSlot.startTime);
+        const slotEndMinutes = this.timeToMinutes(timeSlot.endTime);
+
+        // Check if time slot falls within technician's working hours
+        if (
+          slotStartMinutes < workStartMinutes ||
+          slotEndMinutes > workEndMinutes
+        ) {
+          return sendResponse(
+            HttpStatus.BAD_REQUEST,
+            false,
+            `Selected time slot (${timeSlot.startTime}-${timeSlot.endTime}) is outside technician's working hours (${technician.workStartTime}-${technician.workEndTime})`,
+          );
+        }
+      }
+
       const conflict = await this.prisma.job.findFirst({
         where: {
           technicianId: createJobDto.technicianId,
           scheduledDate: new Date(createJobDto.scheduledDate),
           timeSlotId: createJobDto.timeSlotId,
-          status: { notIn: [JobStatus.PENDING] }
+          status: JobStatus.ASSIGNED,
         },
       });
 
@@ -186,7 +234,7 @@ export class JobsService {
           message,
         );
 
-        console.log("seddddd", smsResult)
+        console.log('seddddd', smsResult);
 
         smsStatus = {
           sent: smsResult.success,
@@ -296,9 +344,15 @@ export class JobsService {
         };
       }
 
-      // Filter by status
-      if (status) {
+      // Filter by status - only allow valid JobStatus values
+      if (
+        status &&
+        (status === JobStatus.ASSIGNED || status === JobStatus.COMPLETED)
+      ) {
         where.status = status;
+      } else if (status) {
+        // Log warning but don't apply invalid status filter
+        this.logger.warn(`Invalid status filter ignored: ${status}`);
       }
 
       // Filter by createdAt date
@@ -372,6 +426,38 @@ export class JobsService {
         },
       });
 
+      // AUTO-COMPLETE: Update jobs that have expired time slots
+      const updatedJobs = await Promise.all(
+        jobs.map(async (job) => {
+          if (
+            job.status === JobStatus.ASSIGNED &&
+            this.shouldAutoCompleteJob(job)
+          ) {
+            return await this.prisma.job.update({
+              where: { id: job.id },
+              data: {
+                status: JobStatus.COMPLETED,
+                updatedAt: new Date(),
+              },
+              include: {
+                timeSlot: true,
+                technician: {
+                  select: {
+                    id: true,
+                    name: true,
+                    phone: true,
+                    photo: true,
+                    address: true,
+                    isActive: true,
+                  },
+                },
+              },
+            });
+          }
+          return job;
+        }),
+      );
+
       // Calculate pagination metadata
       const totalPages = Math.ceil(totalCount / limit);
       const hasNextPage = page < totalPages;
@@ -386,7 +472,7 @@ export class JobsService {
           hasNextPage,
           hasPrevPage,
         },
-        jobs,
+        updatedJobs,
       };
 
       return sendResponse(
@@ -431,7 +517,42 @@ export class JobsService {
         return sendResponse(HttpStatus.NOT_FOUND, false, 'Job not found', null);
       }
 
-      return sendResponse(HttpStatus.OK, true, 'Job fetched successfully', job);
+      // AUTO-COMPLETE: Update job if time slot has ended
+      let updatedJob = job;
+      if (
+        job.status === JobStatus.ASSIGNED &&
+        this.shouldAutoCompleteJob(job)
+      ) {
+        updatedJob = await this.prisma.job.update({
+          where: { id },
+          data: {
+            status: JobStatus.COMPLETED,
+            updatedAt: new Date(),
+          },
+          include: {
+            timeSlot: true,
+            technician: {
+              select: {
+                id: true,
+                name: true,
+                phone: true,
+                photo: true,
+                address: true,
+                workStartTime: true,
+                workEndTime: true,
+                isActive: true,
+              },
+            },
+          },
+        });
+      }
+
+      return sendResponse(
+        HttpStatus.OK,
+        true,
+        'Job fetched successfully',
+        updatedJob,
+      );
     } catch (error) {
       this.logger.error('Error fetching job:', error);
       return sendResponse(
@@ -556,20 +677,14 @@ export class JobsService {
       // Execute all counts in parallel
       const [
         totalJobs,
-        pendingJobs,
         assignedJobs,
         completedJobs,
         totalTechnicians,
         activeTechnicians,
-        assignedThisWeek, // NEW: Assigned jobs in current week
+        assignedThisWeek, //  Assigned jobs in current week
       ] = await Promise.all([
         // Total jobs
         this.prisma.job.count({ where: dateFilter }),
-
-        // Pending jobs
-        this.prisma.job.count({
-          where: { ...dateFilter, status: JobStatus.PENDING },
-        }),
 
         // Assigned jobs
         this.prisma.job.count({
@@ -598,6 +713,8 @@ export class JobsService {
           },
         }),
       ]);
+
+      const pendingJobs = assignedJobs - completedJobs;
 
       // Calculate rates
       const assignedAndCompletedJobs = assignedJobs + completedJobs;
