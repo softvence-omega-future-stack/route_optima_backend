@@ -158,10 +158,13 @@ export class TechnicianController {
     }
   }
 
-    @Get('single/details/:id')
+  @Get('single/details/:id')
   @UseGuards(AuthGuard, RolesGuard)
   @AuthRoles(UserRole.ADMIN)
-  async getTechnicianDetailsById(@Param('id') id: string, @Res() res: Response) {
+  async getTechnicianDetailsById(
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
     try {
       const result = await this.technicianService.getTechnicianDetailsById(id);
 

@@ -64,19 +64,19 @@ export class AuthController {
     try {
       const loginResult = await this.authService.login(loginDto);
 
-      res.cookie('access_token', loginResult.accessToken, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'strict',
-        maxAge: 1000 * 60 * 15, // 15 minutes
-      });
+      // res.cookie('access_token', loginResult.accessToken, {
+      //   httpOnly: true,
+      //   secure: true,
+      //   sameSite: 'strict',
+      //   maxAge: 1000 * 60 * 15,
+      // });
 
-      res.cookie('refresh_token', loginResult.refreshToken, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'strict',
-        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
-      });
+      // res.cookie('refresh_token', loginResult.refreshToken, {
+      //   httpOnly: true,
+      //   secure: true,
+      //   sameSite: 'strict',
+      //   maxAge: 1000 * 60 * 60 * 24 * 7, 
+      // });
 
       return {
         success: true,

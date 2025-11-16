@@ -17,3 +17,12 @@ export interface CustomCookiesResponse extends Response {
   cookie(name: string, value: string, options?: CookieOptions): this;
   clearCookie(name: string, options?: CookieOptions): this;
 }
+
+export interface JwtPayload {
+  sub: string;    
+  email: string;
+  role: string;
+  iat?: number;  
+  exp?: number;   
+}
+
