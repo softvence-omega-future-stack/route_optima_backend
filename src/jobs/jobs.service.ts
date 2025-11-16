@@ -223,7 +223,7 @@ export class JobsService {
           Address: ${job.serviceAddress}
           Phone: ${job.customerPhone}
 
-          Date: ${job.scheduledDate.toLocaleDateString()}
+          Date: ${job.scheduledDate.toISOString().split('T')[0]}
           Time Slot: ${job.timeSlot?.label ?? 'N/A'}
 
           Job Details: ${job.jobDescription}
