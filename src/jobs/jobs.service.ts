@@ -66,12 +66,45 @@ export class JobsService {
         );
       }
 
+      // technician working hours check
+      if (technician.workStartTime && technician.workEndTime) {
+        const timeSlot = await this.prisma.defaultTimeSlot.findUnique({
+          where: { id: createJobDto.timeSlotId },
+        });
+
+        if (!timeSlot) {
+          return sendResponse(
+            HttpStatus.NOT_FOUND,
+            false,
+            'Time slot not found',
+          );
+        }
+
+        // Convert times to minutes for comparison
+        const workStartMinutes = this.timeToMinutes(technician.workStartTime);
+        const workEndMinutes = this.timeToMinutes(technician.workEndTime);
+        const slotStartMinutes = this.timeToMinutes(timeSlot.startTime);
+        const slotEndMinutes = this.timeToMinutes(timeSlot.endTime);
+
+        // Check if time slot falls within technician's working hours
+        if (
+          slotStartMinutes < workStartMinutes ||
+          slotEndMinutes > workEndMinutes
+        ) {
+          return sendResponse(
+            HttpStatus.BAD_REQUEST,
+            false,
+            `Selected time slot (${timeSlot.startTime}-${timeSlot.endTime}) is outside technician's working hours (${technician.workStartTime}-${technician.workEndTime})`,
+          );
+        }
+      }
+
       const conflict = await this.prisma.job.findFirst({
         where: {
           technicianId: createJobDto.technicianId,
           scheduledDate: new Date(createJobDto.scheduledDate),
           timeSlotId: createJobDto.timeSlotId,
-          status: { notIn: [JobStatus.ASSIGNED] }
+          status: { notIn: [JobStatus.ASSIGNED] },
         },
       });
 
@@ -186,7 +219,7 @@ export class JobsService {
           message,
         );
 
-        console.log("seddddd", smsResult)
+        console.log('seddddd', smsResult);
 
         smsStatus = {
           sent: smsResult.success,
@@ -593,7 +626,7 @@ export class JobsService {
         }),
       ]);
 
-    const pendingJobs = assignedJobs - completedJobs;
+      const pendingJobs = assignedJobs - completedJobs;
 
       // Calculate rates
       const assignedAndCompletedJobs = assignedJobs + completedJobs;
@@ -637,5 +670,10 @@ export class JobsService {
         null,
       );
     }
+  }
+
+  private timeToMinutes(timeString: string): number {
+    const [hours, minutes] = timeString.split(':').map(Number);
+    return hours * 60 + minutes;
   }
 }
