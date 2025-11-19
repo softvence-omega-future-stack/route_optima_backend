@@ -11,6 +11,7 @@ import { GetStatsDto } from './dto/get-stats.dto';
 import { JobStatus } from '@prisma/client';
 import { NotificationPreferencesService } from 'src/notification-preferences/notification-preferences.service';
 import { MailService } from 'src/mail/mail.service';
+import { GetAvailableTechniciansDto } from './dto/get-available-technicians.dto';
 
 @Injectable()
 export class JobsService {
@@ -859,6 +860,153 @@ export class JobsService {
         HttpStatus.INTERNAL_SERVER_ERROR,
         false,
         'Failed to delete job',
+      );
+    }
+  }
+
+  async getAvailableTechnicians(
+    getAvailableTechniciansDto: GetAvailableTechniciansDto,
+  ) {
+    try {
+      this.logger.log('Fetching available technicians...');
+
+      const { scheduledDate, timeSlotId } = getAvailableTechniciansDto;
+
+      // Validate inputs
+      if (!scheduledDate || !timeSlotId) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          'Scheduled date and time slot ID are required',
+        );
+      }
+
+      // Validate date format
+      const scheduledDateTime = new Date(scheduledDate);
+      if (isNaN(scheduledDateTime.getTime())) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          'Invalid scheduled date format. Use YYYY-MM-DD format.',
+        );
+      }
+
+      // Validate date is today or future - PROPER FIX
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Set to start of today
+
+      const inputDate = new Date(scheduledDate);
+      inputDate.setHours(0, 0, 0, 0); // Set to start of input date
+
+      // Compare timestamps
+      if (inputDate.getTime() < today.getTime()) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          'Please select today or a future date.',
+        );
+      }
+
+      // Validate time slot exists
+      const timeSlot = await this.prisma.defaultTimeSlot.findUnique({
+        where: { id: timeSlotId },
+      });
+
+      if (!timeSlot) {
+        return sendResponse(HttpStatus.NOT_FOUND, false, 'Time slot not found');
+      }
+
+      if (!timeSlot.isActive) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          'Time slot is not active',
+        );
+      }
+
+      // Get all active technicians - ONLY SELECT ID AND NAME
+      const activeTechnicians = await this.prisma.technician.findMany({
+        where: {
+          isActive: true,
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+
+      if (activeTechnicians.length === 0) {
+        return sendResponse(
+          HttpStatus.OK,
+          true,
+          'No active technicians found',
+          [],
+        );
+      }
+
+      // Check for conflicting jobs for each technician
+      const availableTechnicians = await Promise.all(
+        activeTechnicians.map(async (technician) => {
+          // Check if technician has any job at the same date and time slot
+          const conflictingJob = await this.prisma.job.findFirst({
+            where: {
+              technicianId: technician.id,
+              scheduledDate: scheduledDateTime,
+              timeSlotId: timeSlotId,
+              status: JobStatus.ASSIGNED,
+            },
+          });
+
+          const isAvailable = !conflictingJob;
+
+          // Only return id and name for available technicians
+          if (isAvailable) {
+            return {
+              id: technician.id,
+              name: technician.name,
+            };
+          }
+          return null; // Return null for unavailable technicians
+        }),
+      );
+
+      // Filter out null values (unavailable technicians) and get only available ones
+      const available = availableTechnicians.filter((t) => t !== null);
+
+      const result = {
+        scheduledDate: scheduledDateTime.toISOString().split('T')[0],
+        timeSlot: {
+          id: timeSlot.id,
+          label: timeSlot.label,
+          startTime: timeSlot.startTime,
+          endTime: timeSlot.endTime,
+        },
+        availableTechnicians: available,
+        summary: {
+          total: activeTechnicians.length,
+          available: available.length,
+          unavailable: activeTechnicians.length - available.length,
+        },
+      };
+
+      return sendResponse(
+        HttpStatus.OK,
+        true,
+        'Available technicians fetched successfully',
+        result,
+      );
+    } catch (error) {
+      this.logger.error('Error fetching available technicians:', error);
+
+      // Handle specific Prisma errors
+      if (error.code === 'P2025') {
+        return sendResponse(HttpStatus.NOT_FOUND, false, 'Time slot not found');
+      }
+
+      return sendResponse(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        false,
+        'Failed to fetch available technicians',
       );
     }
   }
