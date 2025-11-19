@@ -126,7 +126,7 @@ export class JobsService {
 
       if (conflict) {
         return sendResponse(
-          HttpStatus.NOT_FOUND,
+          HttpStatus.CONFLICT,
           false,
           'This technician is already booked for the same date and time slot.',
         );
