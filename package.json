@@ -12,7 +12,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "migrate:fix": "npx prisma migrate resolve --applied 20251116040138_init || true",
-    "start:prod": "npm run migrate:fix && npx prisma migrate deploy && node dist/src/main",
+    "start:prod": "npm run migrate:fix && npx prisma migrate deploy && node dist/main.js",
     "prisma:seed": "prisma db seed",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
