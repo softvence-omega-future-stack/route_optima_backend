@@ -20,6 +20,7 @@ import { AuthGuard } from 'src/auth/guards/jwt-auth-guard';
 import { RolesGuard } from 'src/auth/guards/role-guard';
 import { UserRole } from '@prisma/client';
 import { AuthRoles } from 'src/common/decorators/roles.decorator';
+import { GetAvailableTechniciansDto } from './dto/get-available-technicians.dto';
 
 @Controller('api/v1/jobs')
 export class JobsController {
@@ -74,5 +75,14 @@ export class JobsController {
   @HttpCode(200)
   async getJobStats(@Query() getStatsDto: GetStatsDto) {
     return this.jobsService.getJobStats(getStatsDto);
+  }
+
+  // available technicians for a job
+  @Get('available-technicians')
+  @UseGuards(AuthGuard, RolesGuard)
+  @AuthRoles(UserRole.ADMIN)
+  @HttpCode(200)
+  async getAvailableTechnicians(@Query() getAvailableTechniciansDto: GetAvailableTechniciansDto) {
+    return this.jobsService.getAvailableTechnicians(getAvailableTechniciansDto);
   }
 }

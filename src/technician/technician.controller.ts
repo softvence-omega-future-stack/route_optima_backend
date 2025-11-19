@@ -334,4 +334,6 @@ export class TechnicianController {
       );
     }
   }
+
+  
 }
