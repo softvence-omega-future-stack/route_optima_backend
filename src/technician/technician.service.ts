@@ -237,21 +237,16 @@ export class TechnicianService {
             },
           });
 
-          // Calculate pending jobs based on formula
-          const todayPending = todayAssigned - todayCompleted;
-          const totalPending = totalAssigned - totalCompleted;
 
           return {
             ...technician,
             todayStats: {
               assigned: todayAssigned,
               completed: todayCompleted,
-              pending: todayPending,
             },
             overallStats: {
               assigned: totalAssigned,
               completed: totalCompleted,
-              pending: totalPending,
               completionRate:
                 totalAssigned > 0
                   ? Number(((totalCompleted / totalAssigned) * 100).toFixed(2))
@@ -380,10 +375,6 @@ export class TechnicianService {
           }),
         ]);
 
-      // Calculate pending jobs
-      const todayPending = todayAssigned - todayCompleted;
-      const totalPending = totalAssigned - totalCompleted;
-
       // Add statistics to technician response
       const technicianWithStats = {
         ...technician,
@@ -391,12 +382,10 @@ export class TechnicianService {
           today: {
             assigned: todayAssigned,
             completed: todayCompleted,
-            pending: todayPending,
           },
           overall: {
             totalAssigned: totalAssigned,
             totalCompleted: totalCompleted,
-            totalPending: totalPending,
             completionRate:
               totalAssigned > 0
                 ? Number(((totalCompleted / totalAssigned) * 100).toFixed(2))

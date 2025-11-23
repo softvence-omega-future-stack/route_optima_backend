@@ -693,7 +693,7 @@ export class JobsService {
         completedJobs,
         totalTechnicians,
         activeTechnicians,
-        assignedThisWeek, //  Assigned jobs in current week
+        assignedThisWeek, 
       ] = await Promise.all([
         // Total jobs
         this.prisma.job.count({ where: dateFilter }),
@@ -718,15 +718,13 @@ export class JobsService {
         this.prisma.job.count({
           where: {
             status: JobStatus.ASSIGNED,
-            createdAt: {
+            scheduledDate: {
               gte: currentWeekStart,
               lt: currentWeekEnd,
             },
           },
         }),
       ]);
-
-      const pendingJobs = assignedJobs - completedJobs;
 
       // Calculate rates
       const assignedAndCompletedJobs = assignedJobs + completedJobs;
@@ -745,12 +743,11 @@ export class JobsService {
 
       const stats = {
         totalJobs,
-        pendingJobs,
         assignedJobs,
         completedJobs,
         totalTechnicians,
         activeTechnicians,
-        assignedThisWeek, // NEW FIELD
+        assignedThisWeek, 
         completionRate,
         efficiency,
       };
