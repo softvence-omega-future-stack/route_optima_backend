@@ -193,9 +193,9 @@ export class AuthService {
       });
 
       // If no session was found, it might already be cleaned up
-      if (result.count === 0) {
-        console.log('Session already deleted or not found');
-      }
+      // if (result.count === 0) {
+      //   console.log('Session already deleted or not found');
+      // }
 
       return true;
     } catch (error) {

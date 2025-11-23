@@ -63,7 +63,7 @@ export class TechnicianController {
       // console.log(technicianData)
       return this.technicianService.createTechnician(technicianData);
     } catch (error) {
-      console.log(error);
+      // console.log(error);
       if (error instanceof SyntaxError) {
         throw new BadRequestException('Invalid JSON data provided');
       }

@@ -237,7 +237,7 @@ export class JobsService {
           message,
         );
 
-        console.log('This is the sms result ->', smsResult);
+        // console.log('This is the sms result ->', smsResult);
 
         smsStatus = {
           sent: smsResult.success,
