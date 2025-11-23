@@ -805,8 +805,8 @@ export class JobsService {
       }
 
       // Check if job is in the past (optional business rule)
-      const now = new Date();
-      const jobDateTime = new Date(existingJob.scheduledDate);
+      // const now = new Date();
+      // const jobDateTime = new Date(existingJob.scheduledDate);
 
       // If you want to prevent deletion of past jobs, uncomment this:
       // if (jobDateTime < now) {
@@ -818,17 +818,17 @@ export class JobsService {
       // }
 
       // Additional validation: Check if job is scheduled for today and time slot hasn't ended
-      const today = new Date().toISOString().split('T')[0];
-      const jobDate = existingJob.scheduledDate.toISOString().split('T')[0];
-      const currentTime = new Date().toTimeString().slice(0, 5);
+      // const today = new Date().toISOString().split('T')[0];
+      // const jobDate = existingJob.scheduledDate.toISOString().split('T')[0];
+      // const currentTime = new Date().toTimeString().slice(0, 5);
 
-      if (jobDate === today && existingJob.timeSlot.endTime > currentTime) {
-        return sendResponse(
-          HttpStatus.BAD_REQUEST,
-          false,
-          `Cannot delete job that is scheduled for today and hasn't ended yet (Time slot: ${existingJob.timeSlot.startTime}-${existingJob.timeSlot.endTime})`,
-        );
-      }
+      // if (jobDate === today && existingJob.timeSlot.endTime > currentTime) {
+      //   return sendResponse(
+      //     HttpStatus.BAD_REQUEST,
+      //     false,
+      //     `Cannot delete job that is scheduled for today and hasn't ended yet (Time slot: ${existingJob.timeSlot.startTime}-${existingJob.timeSlot.endTime})`,
+      //   );
+      // }
 
       // Delete the job
       await this.prisma.job.delete({
