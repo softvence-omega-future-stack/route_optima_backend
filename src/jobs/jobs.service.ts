@@ -140,12 +140,12 @@ export class JobsService {
         return sendResponse(HttpStatus.NOT_FOUND, false, 'Time slot not found');
       }
 
-      // 2. Parse address
+      // Parse address
       const parsedAddress = await this.addressParser.parseAddress(
         createJobDto.serviceAddress,
       );
 
-      // 3. Geocode fallback
+      // Geocode fallback
       let { latitude, longitude } = createJobDto;
 
       if (!latitude || !longitude) {
@@ -158,7 +158,7 @@ export class JobsService {
         }
       }
 
-      // 4. Create job
+      // Create job
       const job = await this.prisma.job.create({
         data: {
           customerName: createJobDto.customerName,
@@ -245,7 +245,6 @@ export class JobsService {
         };
       }
 
-      // 7. Response
       return sendResponse(
         HttpStatus.CREATED,
         true,
@@ -364,7 +363,7 @@ export class JobsService {
         const endDate = new Date(date);
         endDate.setDate(endDate.getDate() + 1);
 
-        where.createdAt = {
+        where.scheduledDate = {
           gte: startDate,
           lt: endDate,
         };
