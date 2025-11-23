@@ -58,7 +58,7 @@ export class TechnicianController {
 
       // Add the photo path if uploaded
       if (file) {
-        technicianData.photo = `/uploads/${file.path}`;
+        technicianData.photo = `${file.path}`;
       }
       // console.log(technicianData)
       return this.technicianService.createTechnician(technicianData);
