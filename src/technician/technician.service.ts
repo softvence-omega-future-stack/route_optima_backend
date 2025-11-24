@@ -11,31 +11,11 @@ import { JobStatus, Prisma } from '@prisma/client';
 import { GetAllTechniciansDto } from './dto/get-all-technicians-dto';
 import { UpdateTechnicianDto } from './dto/update-technician.dto';
 import { join } from 'path';
-// import { existsSync, unlinkSync } from 'fs';
 import { promises as fsPromises } from 'fs';
 
 @Injectable()
 export class TechnicianService {
   constructor(private prisma: PrismaService) {}
-
-  // private async deletePhotoFile(photoPath: string | null): Promise<void> {
-  //   if (!photoPath) return;
-
-  //   try {
-  //     const filename = photoPath.replace('/uploads/', '');
-  //     const fullPath = join(__dirname, '..', '..', 'uploads', filename);
-
-  //     // Check if file exists before attempting to delete
-  //     if (existsSync(fullPath)) {
-  //       await unlinkSync(fullPath);
-  //       console.log(`Deleted photo file: ${fullPath}`);
-  //     } else {
-  //       console.log(`Photo file not found: ${fullPath}`);
-  //     }
-  //   } catch (error) {
-  //     console.error(`Failed to delete photo file: ${photoPath}`, error);
-  //   }
-  // }
 
   private async deletePhotoFile(photoPath: string | null): Promise<void> {
   if (!photoPath) return;
