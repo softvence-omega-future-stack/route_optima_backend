@@ -52,7 +52,7 @@ export class TechnicianController {
     @Body('data') data: string,
   ) {
     try {
-      console.log(file);
+      // console.log(file);
       // Parse the JSON string
       const technicianData: CreateTechnicianDto = JSON.parse(data);
 

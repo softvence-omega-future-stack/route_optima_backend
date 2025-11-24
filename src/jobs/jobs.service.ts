@@ -12,6 +12,8 @@ import { JobStatus } from '@prisma/client';
 import { NotificationPreferencesService } from 'src/notification-preferences/notification-preferences.service';
 import { MailService } from 'src/mail/mail.service';
 import { GetAvailableTechniciansDto } from './dto/get-available-technicians.dto';
+import { existsSync, unlinkSync } from 'fs';
+import { join } from 'path';
 
 @Injectable()
 export class JobsService {
@@ -45,7 +47,6 @@ export class JobsService {
     try {
       this.logger.log('Creating new job...');
 
-      // 1. Validate technician
       if (!createJobDto.technicianId) {
         return sendResponse(
           HttpStatus.BAD_REQUEST,
@@ -211,7 +212,7 @@ export class JobsService {
       }
 
       // SMS ------------------------------
-      let smsStatus = { sent: false, message: 'SMS disabled' };
+      let smsStatus = { sent: false };
 
       const technicianWantsSMS =
         technician.phone && preferences.sendTechnicianSMS;
@@ -232,16 +233,12 @@ export class JobsService {
           — Dispatch Bros
         `.trim();
 
-        const smsResult = await this.twilioUtil.sendSMS(
-          technician.phone,
-          message,
-        );
+        const smsResult = await this.twilioUtil.sendSMS(technician.phone);
 
         // console.log('This is the sms result ->', smsResult);
 
         smsStatus = {
           sent: smsResult.success,
-          message: smsResult.message,
         };
       }
 
@@ -693,7 +690,7 @@ export class JobsService {
         completedJobs,
         totalTechnicians,
         activeTechnicians,
-        assignedThisWeek, 
+        assignedThisWeek,
       ] = await Promise.all([
         // Total jobs
         this.prisma.job.count({ where: dateFilter }),
@@ -747,7 +744,7 @@ export class JobsService {
         completedJobs,
         totalTechnicians,
         activeTechnicians,
-        assignedThisWeek, 
+        assignedThisWeek,
         completionRate,
         efficiency,
       };
@@ -766,6 +763,25 @@ export class JobsService {
         'Failed to fetch statistics',
         null,
       );
+    }
+  }
+
+    private async deletePhotoFile(photoPath: string | null) {
+    if (!photoPath) return;
+
+    try {
+      const filename = photoPath.replace('/uploads/', '');
+
+      const fullPath = join(__dirname, '..', '..', 'uploads', filename);
+
+      if (existsSync(fullPath)) {
+        unlinkSync(fullPath);
+        this.logger.log(`Photo deleted: ${fullPath}`);
+      } else {
+        this.logger.warn(`Photo not found: ${fullPath}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to delete photo:', error);
     }
   }
 
@@ -801,30 +817,8 @@ export class JobsService {
         return sendResponse(HttpStatus.NOT_FOUND, false, 'Job not found');
       }
 
-      // Check if job is in the past (optional business rule)
-      // const now = new Date();
-      // const jobDateTime = new Date(existingJob.scheduledDate);
-
-      // If you want to prevent deletion of past jobs, uncomment this:
-      // if (jobDateTime < now) {
-      //   return sendResponse(
-      //     HttpStatus.BAD_REQUEST,
-      //     false,
-      //     'Cannot delete past jobs',
-      //   );
-      // }
-
-      // Additional validation: Check if job is scheduled for today and time slot hasn't ended
-      // const today = new Date().toISOString().split('T')[0];
-      // const jobDate = existingJob.scheduledDate.toISOString().split('T')[0];
-      // const currentTime = new Date().toTimeString().slice(0, 5);
-
-      // if (jobDate === today && existingJob.timeSlot.endTime > currentTime) {
-      //   return sendResponse(
-      //     HttpStatus.BAD_REQUEST,
-      //     false,
-      //     `Cannot delete job that is scheduled for today and hasn't ended yet (Time slot: ${existingJob.timeSlot.startTime}-${existingJob.timeSlot.endTime})`,
-      //   );
+      // if (existingJob.photo) {
+      //   await this.deletePhotoFile(existingJob.photo);
       // }
 
       // Delete the job
@@ -1006,4 +1000,6 @@ export class JobsService {
       );
     }
   }
+
+
 }

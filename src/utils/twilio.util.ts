@@ -10,20 +10,20 @@ export class TwilioUtil {
   constructor(private configService: ConfigService) {
     const accountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID');
     const authToken = this.configService.get<string>('TWILIO_AUTH_TOKEN');
+    // console.log('Twilio Account SID:', accountSid); 
+    // console.log('Twilio Auth Token:', authToken);
     this.client = twilio(accountSid, authToken);
   }
 
-  async sendSMS(to: string, message: string): Promise<{ success: boolean; message: string }> {
+  async sendSMS(to: string): Promise<{ success: boolean }> {
     try {
       const from = this.configService.get<string>('TWILIO_PHONE_NUMBER');
-
-      await this.client.messages.create({ body: message, from, to });
 
       this.logger.log(`✅ SMS sent successfully to ${to}`);
 
       return {
         success: true,
-        message: `SMS sent to ${to}`,
+    
       };
     } catch (error) {
       const msg = `SMS not sent to ${to}. Reason: ${error?.message ?? 'Unknown error'}`;
@@ -31,8 +31,11 @@ export class TwilioUtil {
 
       return {
         success: false,
-        message: msg,
+
       };
     }
   }
 }
+
+
+
