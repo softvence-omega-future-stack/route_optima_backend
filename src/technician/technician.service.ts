@@ -11,30 +11,75 @@ import { JobStatus, Prisma } from '@prisma/client';
 import { GetAllTechniciansDto } from './dto/get-all-technicians-dto';
 import { UpdateTechnicianDto } from './dto/update-technician.dto';
 import { join } from 'path';
-import { existsSync, unlinkSync } from 'fs';
+// import { existsSync, unlinkSync } from 'fs';
+import { promises as fsPromises } from 'fs';
 
 @Injectable()
 export class TechnicianService {
   constructor(private prisma: PrismaService) {}
 
+  // private async deletePhotoFile(photoPath: string | null): Promise<void> {
+  //   if (!photoPath) return;
+
+  //   try {
+  //     const filename = photoPath.replace('/uploads/', '');
+  //     const fullPath = join(__dirname, '..', '..', 'uploads', filename);
+
+  //     // Check if file exists before attempting to delete
+  //     if (existsSync(fullPath)) {
+  //       await unlinkSync(fullPath);
+  //       console.log(`Deleted photo file: ${fullPath}`);
+  //     } else {
+  //       console.log(`Photo file not found: ${fullPath}`);
+  //     }
+  //   } catch (error) {
+  //     console.error(`Failed to delete photo file: ${photoPath}`, error);
+  //   }
+  // }
+
   private async deletePhotoFile(photoPath: string | null): Promise<void> {
-    if (!photoPath) return;
+  if (!photoPath) return;
+
+  try {
+    const filename = photoPath.split('/').pop() || photoPath;
+    const fullPath = join(__dirname, '..', '..', 'uploads', filename);
+
+    console.log(`Attempting to delete: ${fullPath}`);
 
     try {
-      const filename = photoPath.replace('/uploads/', '');
-      const fullPath = join(__dirname, '..', '..', 'uploads', filename);
+      await fsPromises.unlink(fullPath);
+      console.log(`Successfully deleted: ${fullPath}`);
+    } catch (unlinkError: any) {
+      if (unlinkError.code === 'ENOENT') {
+        console.warn(`File not found: ${fullPath}`);
+        
+        // Try alternative paths
+        const alternativePaths = [
+          join(process.cwd(), 'uploads', filename),
+          join(__dirname, '..', 'uploads', filename),
+          photoPath // original path
+        ];
 
-      // Check if file exists before attempting to delete
-      if (existsSync(fullPath)) {
-        await unlinkSync(fullPath);
-        console.log(`Deleted photo file: ${fullPath}`);
+        for (const altPath of alternativePaths) {
+          try {
+            await fsPromises.unlink(altPath);
+            console.log(`Successfully deleted from alternative path: ${altPath}`);
+            return;
+          } catch (altError: any) {
+            if (altError.code !== 'ENOENT') {
+              console.error(`Error deleting from ${altPath}:`, altError);
+            }
+          }
+        }
       } else {
-        console.log(`Photo file not found: ${fullPath}`);
+        throw unlinkError;
       }
-    } catch (error) {
-      console.error(`Failed to delete photo file: ${photoPath}`, error);
     }
+  } catch (error) {
+    console.error(`Failed to delete photo file: ${photoPath}`, error);
+    // Continue with deletion even if file deletion fails
   }
+}
 
   private validateWorkHours(startTime: string, endTime: string): void {
     const [startHour, startMin] = startTime.split(':').map(Number);

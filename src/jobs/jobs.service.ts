@@ -766,7 +766,7 @@ export class JobsService {
     }
   }
 
-    private async deletePhotoFile(photoPath: string | null) {
+  private async deletePhotoFile(photoPath: string | null) {
     if (!photoPath) return;
 
     try {
@@ -816,10 +816,6 @@ export class JobsService {
       if (!existingJob) {
         return sendResponse(HttpStatus.NOT_FOUND, false, 'Job not found');
       }
-
-      // if (existingJob.photo) {
-      //   await this.deletePhotoFile(existingJob.photo);
-      // }
 
       // Delete the job
       await this.prisma.job.delete({
@@ -1000,6 +996,4 @@ export class JobsService {
       );
     }
   }
-
-
 }
