@@ -12,6 +12,9 @@ import { JobStatus } from '@prisma/client';
 import { NotificationPreferencesService } from 'src/notification-preferences/notification-preferences.service';
 import { MailService } from 'src/mail/mail.service';
 import { GetAvailableTechniciansDto } from './dto/get-available-technicians.dto';
+import { existsSync, unlinkSync } from 'fs';
+import { join } from 'path';
+import { GetAvailableSlotsDto } from './dto/get-available-slots.dto';
 
 @Injectable()
 export class JobsService {
@@ -45,7 +48,6 @@ export class JobsService {
     try {
       this.logger.log('Creating new job...');
 
-      // 1. Validate technician
       if (!createJobDto.technicianId) {
         return sendResponse(
           HttpStatus.BAD_REQUEST,
@@ -140,12 +142,12 @@ export class JobsService {
         return sendResponse(HttpStatus.NOT_FOUND, false, 'Time slot not found');
       }
 
-      // 2. Parse address
+      // Parse address
       const parsedAddress = await this.addressParser.parseAddress(
         createJobDto.serviceAddress,
       );
 
-      // 3. Geocode fallback
+      // Geocode fallback
       let { latitude, longitude } = createJobDto;
 
       if (!latitude || !longitude) {
@@ -158,7 +160,7 @@ export class JobsService {
         }
       }
 
-      // 4. Create job
+      // Create job
       const job = await this.prisma.job.create({
         data: {
           customerName: createJobDto.customerName,
@@ -211,7 +213,7 @@ export class JobsService {
       }
 
       // SMS ------------------------------
-      let smsStatus = { sent: false, message: 'SMS disabled' };
+      let smsStatus = { sent: false };
 
       const technicianWantsSMS =
         technician.phone && preferences.sendTechnicianSMS;
@@ -232,20 +234,15 @@ export class JobsService {
           — Dispatch Bros
         `.trim();
 
-        const smsResult = await this.twilioUtil.sendSMS(
-          technician.phone,
-          message,
-        );
+        const smsResult = await this.twilioUtil.sendSMS(technician.phone);
 
-        console.log('This is the sms result ->', smsResult);
+        // console.log('This is the sms result ->', smsResult);
 
         smsStatus = {
           sent: smsResult.success,
-          message: smsResult.message,
         };
       }
 
-      // 7. Response
       return sendResponse(
         HttpStatus.CREATED,
         true,
@@ -364,7 +361,7 @@ export class JobsService {
         const endDate = new Date(date);
         endDate.setDate(endDate.getDate() + 1);
 
-        where.createdAt = {
+        where.scheduledDate = {
           gte: startDate,
           lt: endDate,
         };
@@ -694,7 +691,7 @@ export class JobsService {
         completedJobs,
         totalTechnicians,
         activeTechnicians,
-        assignedThisWeek, //  Assigned jobs in current week
+        assignedThisWeek,
       ] = await Promise.all([
         // Total jobs
         this.prisma.job.count({ where: dateFilter }),
@@ -719,15 +716,13 @@ export class JobsService {
         this.prisma.job.count({
           where: {
             status: JobStatus.ASSIGNED,
-            createdAt: {
+            scheduledDate: {
               gte: currentWeekStart,
               lt: currentWeekEnd,
             },
           },
         }),
       ]);
-
-      const pendingJobs = assignedJobs - completedJobs;
 
       // Calculate rates
       const assignedAndCompletedJobs = assignedJobs + completedJobs;
@@ -746,12 +741,11 @@ export class JobsService {
 
       const stats = {
         totalJobs,
-        pendingJobs,
         assignedJobs,
         completedJobs,
         totalTechnicians,
         activeTechnicians,
-        assignedThisWeek, // NEW FIELD
+        assignedThisWeek,
         completionRate,
         efficiency,
       };
@@ -770,6 +764,25 @@ export class JobsService {
         'Failed to fetch statistics',
         null,
       );
+    }
+  }
+
+  private async deletePhotoFile(photoPath: string | null) {
+    if (!photoPath) return;
+
+    try {
+      const filename = photoPath.replace('/uploads/', '');
+
+      const fullPath = join(__dirname, '..', '..', 'uploads', filename);
+
+      if (existsSync(fullPath)) {
+        unlinkSync(fullPath);
+        this.logger.log(`Photo deleted: ${fullPath}`);
+      } else {
+        this.logger.warn(`Photo not found: ${fullPath}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to delete photo:', error);
     }
   }
 
@@ -803,32 +816,6 @@ export class JobsService {
 
       if (!existingJob) {
         return sendResponse(HttpStatus.NOT_FOUND, false, 'Job not found');
-      }
-
-      // Check if job is in the past (optional business rule)
-      const now = new Date();
-      const jobDateTime = new Date(existingJob.scheduledDate);
-
-      // If you want to prevent deletion of past jobs, uncomment this:
-      // if (jobDateTime < now) {
-      //   return sendResponse(
-      //     HttpStatus.BAD_REQUEST,
-      //     false,
-      //     'Cannot delete past jobs',
-      //   );
-      // }
-
-      // Additional validation: Check if job is scheduled for today and time slot hasn't ended
-      const today = new Date().toISOString().split('T')[0];
-      const jobDate = existingJob.scheduledDate.toISOString().split('T')[0];
-      const currentTime = new Date().toTimeString().slice(0, 5);
-
-      if (jobDate === today && existingJob.timeSlot.endTime > currentTime) {
-        return sendResponse(
-          HttpStatus.BAD_REQUEST,
-          false,
-          `Cannot delete job that is scheduled for today and hasn't ended yet (Time slot: ${existingJob.timeSlot.startTime}-${existingJob.timeSlot.endTime})`,
-        );
       }
 
       // Delete the job
@@ -924,7 +911,7 @@ export class JobsService {
         );
       }
 
-      // Get all active technicians - ONLY SELECT ID AND NAME
+      // Get all active technicians - Include working hours
       const activeTechnicians = await this.prisma.technician.findMany({
         where: {
           isActive: true,
@@ -932,6 +919,8 @@ export class JobsService {
         select: {
           id: true,
           name: true,
+          workStartTime: true,
+          workEndTime: true,
         },
       });
 
@@ -944,7 +933,7 @@ export class JobsService {
         );
       }
 
-      // Check for conflicting jobs for each technician
+      // Check for conflicting jobs AND working hours for each technician
       const availableTechnicians = await Promise.all(
         activeTechnicians.map(async (technician) => {
           // Check if technician has any job at the same date and time slot
@@ -957,21 +946,52 @@ export class JobsService {
             },
           });
 
-          const isAvailable = !conflictingJob;
+          // NEW: Check if time slot falls within technician's working hours
+          let withinWorkingHours = true;
+          if (technician.workStartTime && technician.workEndTime) {
+            const workStartMinutes = this.timeToMinutes(
+              technician.workStartTime,
+            );
+            const workEndMinutes = this.timeToMinutes(technician.workEndTime);
+            const slotStartMinutes = this.timeToMinutes(timeSlot.startTime);
+            const slotEndMinutes = this.timeToMinutes(timeSlot.endTime);
 
-          // Only return id and name for available technicians
+            withinWorkingHours =
+              slotStartMinutes >= workStartMinutes &&
+              slotEndMinutes <= workEndMinutes;
+          }
+
+          const isAvailable = !conflictingJob && withinWorkingHours;
+
+          // Return technician details including availability reason
           if (isAvailable) {
             return {
               id: technician.id,
               name: technician.name,
+              workStartTime: technician.workStartTime,
+              workEndTime: technician.workEndTime,
+              available: true,
+            };
+          } else {
+            return {
+              id: technician.id,
+              name: technician.name,
+              workStartTime: technician.workStartTime,
+              workEndTime: technician.workEndTime,
+              available: false,
+              reason: conflictingJob
+                ? 'Already booked'
+                : 'Outside working hours',
             };
           }
-          return null; // Return null for unavailable technicians
         }),
       );
 
-      // Filter out null values (unavailable technicians) and get only available ones
-      const available = availableTechnicians.filter((t) => t !== null);
+      // Filter only available technicians for the main list
+      const available = availableTechnicians.filter((t) => t.available);
+
+      // Also include unavailable technicians in the response for reference
+      const unavailable = availableTechnicians.filter((t) => !t.available);
 
       const result = {
         scheduledDate: scheduledDateTime.toISOString().split('T')[0],
@@ -982,10 +1002,19 @@ export class JobsService {
           endTime: timeSlot.endTime,
         },
         availableTechnicians: available,
+        unavailableTechnicians: unavailable, // Optional: include for debugging
         summary: {
           total: activeTechnicians.length,
           available: available.length,
-          unavailable: activeTechnicians.length - available.length,
+          unavailable: unavailable.length,
+          unavailableReasons: {
+            alreadyBooked: unavailable.filter(
+              (t) => t.reason === 'Already booked',
+            ).length,
+            outsideWorkingHours: unavailable.filter(
+              (t) => t.reason === 'Outside working hours',
+            ).length,
+          },
         },
       };
 
@@ -1007,6 +1036,160 @@ export class JobsService {
         HttpStatus.INTERNAL_SERVER_ERROR,
         false,
         'Failed to fetch available technicians',
+      );
+    }
+  }
+
+  async getAvailableSlots(getAvailableSlotsDto: GetAvailableSlotsDto) {
+    try {
+      this.logger.log('Fetching available slots for technician...');
+
+      const { scheduledDate, technicianId } = getAvailableSlotsDto;
+
+      // Validate inputs
+      if (!scheduledDate || !technicianId) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          'Scheduled date and technician ID are required',
+        );
+      }
+
+      // Validate date format
+      const scheduledDateTime = new Date(scheduledDate);
+      if (isNaN(scheduledDateTime.getTime())) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          'Invalid scheduled date format. Use YYYY-MM-DD format.',
+        );
+      }
+
+      // Validate technician exists and is active
+      const technician = await this.prisma.technician.findUnique({
+        where: { id: technicianId },
+      });
+
+      if (!technician) {
+        return sendResponse(
+          HttpStatus.NOT_FOUND,
+          false,
+          'Technician not found',
+        );
+      }
+
+      if (!technician.isActive) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          'Technician is not active',
+        );
+      }
+
+      // Get all active time slots
+      const allTimeSlots = await this.prisma.defaultTimeSlot.findMany({
+        where: {
+          isActive: true,
+        },
+        orderBy: {
+          order: 'asc',
+        },
+      });
+
+      if (allTimeSlots.length === 0) {
+        return sendResponse(HttpStatus.OK, true, 'No time slots available', {
+          scheduledDate: scheduledDateTime.toISOString().split('T')[0],
+          technician: {
+            id: technician.id,
+            name: technician.name,
+          },
+          availableSlots: [],
+          summary: {
+            total: 0,
+            available: 0,
+            unavailable: 0,
+          },
+        });
+      }
+
+      // Check for conflicting jobs for each time slot
+      const availableSlots = await Promise.all(
+        allTimeSlots.map(async (timeSlot) => {
+          // Check if technician has any job at the same date and time slot
+          const conflictingJob = await this.prisma.job.findFirst({
+            where: {
+              technicianId: technicianId,
+              scheduledDate: scheduledDateTime,
+              timeSlotId: timeSlot.id,
+              status: JobStatus.ASSIGNED,
+            },
+          });
+
+          const isAvailable = !conflictingJob;
+
+          // Check if time slot falls within technician's working hours
+          let withinWorkingHours = true;
+          if (technician.workStartTime && technician.workEndTime) {
+            const workStartMinutes = this.timeToMinutes(
+              technician.workStartTime,
+            );
+            const workEndMinutes = this.timeToMinutes(technician.workEndTime);
+            const slotStartMinutes = this.timeToMinutes(timeSlot.startTime);
+            const slotEndMinutes = this.timeToMinutes(timeSlot.endTime);
+
+            withinWorkingHours =
+              slotStartMinutes >= workStartMinutes &&
+              slotEndMinutes <= workEndMinutes;
+          }
+
+          return {
+            id: timeSlot.id,
+            label: timeSlot.label,
+            startTime: timeSlot.startTime,
+            endTime: timeSlot.endTime,
+            isAvailable: isAvailable && withinWorkingHours,
+            conflictReason: !isAvailable
+              ? 'Already booked'
+              : !withinWorkingHours
+                ? 'Outside working hours'
+                : null,
+          };
+        }),
+      );
+
+      const available = availableSlots.filter((slot) => slot.isAvailable);
+      const unavailable = availableSlots.filter((slot) => !slot.isAvailable);
+
+      const result = {
+        scheduledDate: scheduledDateTime.toISOString().split('T')[0],
+        technician: {
+          id: technician.id,
+          name: technician.name,
+          workStartTime: technician.workStartTime,
+          workEndTime: technician.workEndTime,
+        },
+        availableSlots: available,
+        unavailableSlots: unavailable,
+        summary: {
+          total: allTimeSlots.length,
+          available: available.length,
+          unavailable: unavailable.length,
+        },
+      };
+
+      return sendResponse(
+        HttpStatus.OK,
+        true,
+        'Available slots fetched successfully',
+        result,
+      );
+    } catch (error) {
+      this.logger.error('Error fetching available slots:', error);
+
+      return sendResponse(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        false,
+        'Failed to fetch available slots',
       );
     }
   }

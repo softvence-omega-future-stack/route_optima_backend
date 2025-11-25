@@ -21,6 +21,7 @@ import { RolesGuard } from 'src/auth/guards/role-guard';
 import { UserRole } from '@prisma/client';
 import { AuthRoles } from 'src/common/decorators/roles.decorator';
 import { GetAvailableTechniciansDto } from './dto/get-available-technicians.dto';
+import { GetAvailableSlotsDto } from './dto/get-available-slots.dto';
 
 @Controller('api/v1/jobs')
 export class JobsController {
@@ -82,7 +83,17 @@ export class JobsController {
   @UseGuards(AuthGuard, RolesGuard)
   @AuthRoles(UserRole.ADMIN)
   @HttpCode(200)
-  async getAvailableTechnicians(@Query() getAvailableTechniciansDto: GetAvailableTechniciansDto) {
+  async getAvailableTechnicians(
+    @Query() getAvailableTechniciansDto: GetAvailableTechniciansDto,
+  ) {
     return this.jobsService.getAvailableTechnicians(getAvailableTechniciansDto);
+  }
+
+  @Get('available-slots')
+  @UseGuards(AuthGuard, RolesGuard)
+  @AuthRoles(UserRole.ADMIN)
+  @HttpCode(200)
+  async getAvailableSlots(@Query() getAvailableSlotsDto: GetAvailableSlotsDto) {
+    return this.jobsService.getAvailableSlots(getAvailableSlotsDto);
   }
 }

@@ -52,18 +52,18 @@ export class TechnicianController {
     @Body('data') data: string,
   ) {
     try {
-      console.log(file);
+      // console.log(file);
       // Parse the JSON string
       const technicianData: CreateTechnicianDto = JSON.parse(data);
 
       // Add the photo path if uploaded
       if (file) {
-        technicianData.photo = `/uploads/${file.path}`;
+        technicianData.photo = `${file.path}`;
       }
       // console.log(technicianData)
       return this.technicianService.createTechnician(technicianData);
     } catch (error) {
-      console.log(error);
+      // console.log(error);
       if (error instanceof SyntaxError) {
         throw new BadRequestException('Invalid JSON data provided');
       }

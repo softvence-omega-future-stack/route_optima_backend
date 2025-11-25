@@ -175,8 +175,7 @@ export class DefaultTimeSlotService {
 
       return { message: 'Time slot deleted successfully' };
     } catch (error) {
-      console.log(error);
-      // Handle both NotFoundException and BadRequestException
+      // console.log(error);
       if (
         error instanceof NotFoundException ||
         error instanceof BadRequestException
