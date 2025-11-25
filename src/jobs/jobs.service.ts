@@ -14,6 +14,7 @@ import { MailService } from 'src/mail/mail.service';
 import { GetAvailableTechniciansDto } from './dto/get-available-technicians.dto';
 import { existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
+import { GetAvailableSlotsDto } from './dto/get-available-slots.dto';
 
 @Injectable()
 export class JobsService {
@@ -993,6 +994,160 @@ export class JobsService {
         HttpStatus.INTERNAL_SERVER_ERROR,
         false,
         'Failed to fetch available technicians',
+      );
+    }
+  }
+
+  async getAvailableSlots(getAvailableSlotsDto: GetAvailableSlotsDto) {
+    try {
+      this.logger.log('Fetching available slots for technician...');
+
+      const { scheduledDate, technicianId } = getAvailableSlotsDto;
+
+      // Validate inputs
+      if (!scheduledDate || !technicianId) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          'Scheduled date and technician ID are required',
+        );
+      }
+
+      // Validate date format
+      const scheduledDateTime = new Date(scheduledDate);
+      if (isNaN(scheduledDateTime.getTime())) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          'Invalid scheduled date format. Use YYYY-MM-DD format.',
+        );
+      }
+
+      // Validate technician exists and is active
+      const technician = await this.prisma.technician.findUnique({
+        where: { id: technicianId },
+      });
+
+      if (!technician) {
+        return sendResponse(
+          HttpStatus.NOT_FOUND,
+          false,
+          'Technician not found',
+        );
+      }
+
+      if (!technician.isActive) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          'Technician is not active',
+        );
+      }
+
+      // Get all active time slots
+      const allTimeSlots = await this.prisma.defaultTimeSlot.findMany({
+        where: {
+          isActive: true,
+        },
+        orderBy: {
+          order: 'asc',
+        },
+      });
+
+      if (allTimeSlots.length === 0) {
+        return sendResponse(HttpStatus.OK, true, 'No time slots available', {
+          scheduledDate: scheduledDateTime.toISOString().split('T')[0],
+          technician: {
+            id: technician.id,
+            name: technician.name,
+          },
+          availableSlots: [],
+          summary: {
+            total: 0,
+            available: 0,
+            unavailable: 0,
+          },
+        });
+      }
+
+      // Check for conflicting jobs for each time slot
+      const availableSlots = await Promise.all(
+        allTimeSlots.map(async (timeSlot) => {
+          // Check if technician has any job at the same date and time slot
+          const conflictingJob = await this.prisma.job.findFirst({
+            where: {
+              technicianId: technicianId,
+              scheduledDate: scheduledDateTime,
+              timeSlotId: timeSlot.id,
+              status: JobStatus.ASSIGNED,
+            },
+          });
+
+          const isAvailable = !conflictingJob;
+
+          // Check if time slot falls within technician's working hours
+          let withinWorkingHours = true;
+          if (technician.workStartTime && technician.workEndTime) {
+            const workStartMinutes = this.timeToMinutes(
+              technician.workStartTime,
+            );
+            const workEndMinutes = this.timeToMinutes(technician.workEndTime);
+            const slotStartMinutes = this.timeToMinutes(timeSlot.startTime);
+            const slotEndMinutes = this.timeToMinutes(timeSlot.endTime);
+
+            withinWorkingHours =
+              slotStartMinutes >= workStartMinutes &&
+              slotEndMinutes <= workEndMinutes;
+          }
+
+          return {
+            id: timeSlot.id,
+            label: timeSlot.label,
+            startTime: timeSlot.startTime,
+            endTime: timeSlot.endTime,
+            isAvailable: isAvailable && withinWorkingHours,
+            conflictReason: !isAvailable
+              ? 'Already booked'
+              : !withinWorkingHours
+                ? 'Outside working hours'
+                : null,
+          };
+        }),
+      );
+
+      const available = availableSlots.filter((slot) => slot.isAvailable);
+      const unavailable = availableSlots.filter((slot) => !slot.isAvailable);
+
+      const result = {
+        scheduledDate: scheduledDateTime.toISOString().split('T')[0],
+        technician: {
+          id: technician.id,
+          name: technician.name,
+          workStartTime: technician.workStartTime,
+          workEndTime: technician.workEndTime,
+        },
+        availableSlots: available,
+        unavailableSlots: unavailable,
+        summary: {
+          total: allTimeSlots.length,
+          available: available.length,
+          unavailable: unavailable.length,
+        },
+      };
+
+      return sendResponse(
+        HttpStatus.OK,
+        true,
+        'Available slots fetched successfully',
+        result,
+      );
+    } catch (error) {
+      this.logger.error('Error fetching available slots:', error);
+
+      return sendResponse(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        false,
+        'Failed to fetch available slots',
       );
     }
   }
