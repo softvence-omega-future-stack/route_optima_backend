@@ -911,7 +911,7 @@ export class JobsService {
         );
       }
 
-      // Get all active technicians - ONLY SELECT ID AND NAME
+      // Get all active technicians - Include working hours
       const activeTechnicians = await this.prisma.technician.findMany({
         where: {
           isActive: true,
@@ -919,6 +919,8 @@ export class JobsService {
         select: {
           id: true,
           name: true,
+          workStartTime: true,
+          workEndTime: true,
         },
       });
 
@@ -931,7 +933,7 @@ export class JobsService {
         );
       }
 
-      // Check for conflicting jobs for each technician
+      // Check for conflicting jobs AND working hours for each technician
       const availableTechnicians = await Promise.all(
         activeTechnicians.map(async (technician) => {
           // Check if technician has any job at the same date and time slot
@@ -944,21 +946,52 @@ export class JobsService {
             },
           });
 
-          const isAvailable = !conflictingJob;
+          // NEW: Check if time slot falls within technician's working hours
+          let withinWorkingHours = true;
+          if (technician.workStartTime && technician.workEndTime) {
+            const workStartMinutes = this.timeToMinutes(
+              technician.workStartTime,
+            );
+            const workEndMinutes = this.timeToMinutes(technician.workEndTime);
+            const slotStartMinutes = this.timeToMinutes(timeSlot.startTime);
+            const slotEndMinutes = this.timeToMinutes(timeSlot.endTime);
 
-          // Only return id and name for available technicians
+            withinWorkingHours =
+              slotStartMinutes >= workStartMinutes &&
+              slotEndMinutes <= workEndMinutes;
+          }
+
+          const isAvailable = !conflictingJob && withinWorkingHours;
+
+          // Return technician details including availability reason
           if (isAvailable) {
             return {
               id: technician.id,
               name: technician.name,
+              workStartTime: technician.workStartTime,
+              workEndTime: technician.workEndTime,
+              available: true,
+            };
+          } else {
+            return {
+              id: technician.id,
+              name: technician.name,
+              workStartTime: technician.workStartTime,
+              workEndTime: technician.workEndTime,
+              available: false,
+              reason: conflictingJob
+                ? 'Already booked'
+                : 'Outside working hours',
             };
           }
-          return null; // Return null for unavailable technicians
         }),
       );
 
-      // Filter out null values (unavailable technicians) and get only available ones
-      const available = availableTechnicians.filter((t) => t !== null);
+      // Filter only available technicians for the main list
+      const available = availableTechnicians.filter((t) => t.available);
+
+      // Also include unavailable technicians in the response for reference
+      const unavailable = availableTechnicians.filter((t) => !t.available);
 
       const result = {
         scheduledDate: scheduledDateTime.toISOString().split('T')[0],
@@ -969,10 +1002,19 @@ export class JobsService {
           endTime: timeSlot.endTime,
         },
         availableTechnicians: available,
+        unavailableTechnicians: unavailable, // Optional: include for debugging
         summary: {
           total: activeTechnicians.length,
           available: available.length,
-          unavailable: activeTechnicians.length - available.length,
+          unavailable: unavailable.length,
+          unavailableReasons: {
+            alreadyBooked: unavailable.filter(
+              (t) => t.reason === 'Already booked',
+            ).length,
+            outsideWorkingHours: unavailable.filter(
+              (t) => t.reason === 'Outside working hours',
+            ).length,
+          },
         },
       };
 
