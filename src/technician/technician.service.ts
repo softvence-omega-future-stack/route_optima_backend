@@ -230,10 +230,14 @@ export class TechnicianService {
             },
           });
 
-          // Get today's completed jobs count
+          // Get today's completed jobs count (scheduled for today AND completed today)
           const todayCompleted = await this.prisma.job.count({
             where: {
               technicianId: technician.id,
+              scheduledDate: {
+                gte: todayStart,
+                lt: todayEnd,
+              },
               updatedAt: {
                 gte: todayStart,
                 lt: todayEnd,
@@ -367,10 +371,14 @@ export class TechnicianService {
             },
           }),
 
-          // Today's completed jobs count
+          // Today's completed jobs count (scheduled for today AND completed today)
           this.prisma.job.count({
             where: {
               technicianId: technician.id,
+              scheduledDate: {
+                gte: todayStart,
+                lt: todayEnd,
+              },
               updatedAt: {
                 gte: todayStart,
                 lt: todayEnd,
@@ -507,10 +515,14 @@ export class TechnicianService {
           },
         }),
 
-        // Today's completed jobs count
+        // Today's completed jobs count (scheduled for today AND completed today)
         this.prisma.job.count({
           where: {
             technicianId: technician.id,
+            scheduledDate: {
+              gte: todayStart,
+              lt: todayEnd,
+            },
             updatedAt: {
               gte: todayStart,
               lt: todayEnd,
