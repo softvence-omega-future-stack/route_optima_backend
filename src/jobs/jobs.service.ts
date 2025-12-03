@@ -34,15 +34,7 @@ export class JobsService {
     return hours * 60 + minutes;
   }
 
-  private shouldAutoCompleteJob(job: any): boolean {
-    const now = new Date();
-    const currentTime = now.toTimeString().slice(0, 5);
-    const currentDate = now.toISOString().split('T')[0];
-    const jobDate = job.scheduledDate.toISOString().split('T')[0];
 
-    // Check if job date is today or in past AND time slot has ended
-    return jobDate <= currentDate && job.timeSlot.endTime < currentTime;
-  }
 
   async createJob(createJobDto: CreateJobDto) {
     try {
@@ -426,37 +418,7 @@ export class JobsService {
         },
       });
 
-      // AUTO-COMPLETE: Update jobs that have expired time slots
-      const updatedJobs = await Promise.all(
-        jobs.map(async (job) => {
-          if (
-            job.status === JobStatus.ASSIGNED &&
-            this.shouldAutoCompleteJob(job)
-          ) {
-            return await this.prisma.job.update({
-              where: { id: job.id },
-              data: {
-                status: JobStatus.COMPLETED,
-                updatedAt: new Date(),
-              },
-              include: {
-                timeSlot: true,
-                technician: {
-                  select: {
-                    id: true,
-                    name: true,
-                    phone: true,
-                    photo: true,
-                    address: true,
-                    isActive: true,
-                  },
-                },
-              },
-            });
-          }
-          return job;
-        }),
-      );
+      const updatedJobs = jobs;
 
       // Calculate pagination metadata
       const totalPages = Math.ceil(totalCount / limit);
@@ -527,35 +489,8 @@ export class JobsService {
         return sendResponse(HttpStatus.NOT_FOUND, false, 'Job not found', null);
       }
 
-      // AUTO-COMPLETE: Update job if time slot has ended
       let updatedJob = job;
-      if (
-        job.status === JobStatus.ASSIGNED &&
-        this.shouldAutoCompleteJob(job)
-      ) {
-        updatedJob = await this.prisma.job.update({
-          where: { id },
-          data: {
-            status: JobStatus.COMPLETED,
-            updatedAt: new Date(),
-          },
-          include: {
-            timeSlot: true,
-            technician: {
-              select: {
-                id: true,
-                name: true,
-                phone: true,
-                photo: true,
-                address: true,
-                workStartTime: true,
-                workEndTime: true,
-                isActive: true,
-              },
-            },
-          },
-        });
-      }
+      
 
       return sendResponse(
         HttpStatus.OK,
@@ -936,14 +871,31 @@ export class JobsService {
       // Check for conflicting jobs AND working hours for each technician
       const availableTechnicians = await Promise.all(
         activeTechnicians.map(async (technician) => {
-          // Check if technician has any job at the same date and time slot
-          const conflictingJob = await this.prisma.job.findFirst({
+          // Check for conflicting jobs (OVERLAPPING TIME SLOTS)
+          const assignedJobs = await this.prisma.job.findMany({
             where: {
               technicianId: technician.id,
               scheduledDate: scheduledDateTime,
-              timeSlotId: timeSlotId,
               status: JobStatus.ASSIGNED,
             },
+            include: {
+              timeSlot: true,
+            },
+          });
+
+          // Check for overlaps
+          const requestedStartMinutes = this.timeToMinutes(timeSlot.startTime);
+          const requestedEndMinutes = this.timeToMinutes(timeSlot.endTime);
+
+          const hasConflict = assignedJobs.some((job) => {
+            const jobStartMinutes = this.timeToMinutes(job.timeSlot.startTime);
+            const jobEndMinutes = this.timeToMinutes(job.timeSlot.endTime);
+
+            // Overlap condition: (StartA < EndB) && (EndA > StartB)
+            return (
+              jobStartMinutes < requestedEndMinutes &&
+              jobEndMinutes > requestedStartMinutes
+            );
           });
 
           // NEW: Check if time slot falls within technician's working hours
@@ -953,15 +905,13 @@ export class JobsService {
               technician.workStartTime,
             );
             const workEndMinutes = this.timeToMinutes(technician.workEndTime);
-            const slotStartMinutes = this.timeToMinutes(timeSlot.startTime);
-            const slotEndMinutes = this.timeToMinutes(timeSlot.endTime);
 
             withinWorkingHours =
-              slotStartMinutes >= workStartMinutes &&
-              slotEndMinutes <= workEndMinutes;
+              requestedStartMinutes >= workStartMinutes &&
+              requestedEndMinutes <= workEndMinutes;
           }
 
-          const isAvailable = !conflictingJob && withinWorkingHours;
+          const isAvailable = !hasConflict && withinWorkingHours;
 
           // Return technician details including availability reason
           if (isAvailable) {
@@ -979,9 +929,7 @@ export class JobsService {
               workStartTime: technician.workStartTime,
               workEndTime: technician.workEndTime,
               available: false,
-              reason: conflictingJob
-                ? 'Already booked'
-                : 'Outside working hours',
+              reason: hasConflict ? 'Already booked' : 'Outside working hours',
             };
           }
         }),
