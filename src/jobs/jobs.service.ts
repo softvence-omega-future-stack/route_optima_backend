@@ -34,15 +34,7 @@ export class JobsService {
     return hours * 60 + minutes;
   }
 
-  private shouldAutoCompleteJob(job: any): boolean {
-    const now = new Date();
-    const currentTime = now.toTimeString().slice(0, 5);
-    const currentDate = now.toISOString().split('T')[0];
-    const jobDate = job.scheduledDate.toISOString().split('T')[0];
 
-    // Check if job date is today or in past AND time slot has ended
-    return jobDate <= currentDate && job.timeSlot.endTime < currentTime;
-  }
 
   async createJob(createJobDto: CreateJobDto) {
     try {
@@ -426,37 +418,7 @@ export class JobsService {
         },
       });
 
-      // AUTO-COMPLETE: Update jobs that have expired time slots
-      const updatedJobs = await Promise.all(
-        jobs.map(async (job) => {
-          if (
-            job.status === JobStatus.ASSIGNED &&
-            this.shouldAutoCompleteJob(job)
-          ) {
-            return await this.prisma.job.update({
-              where: { id: job.id },
-              data: {
-                status: JobStatus.COMPLETED,
-                updatedAt: new Date(),
-              },
-              include: {
-                timeSlot: true,
-                technician: {
-                  select: {
-                    id: true,
-                    name: true,
-                    phone: true,
-                    photo: true,
-                    address: true,
-                    isActive: true,
-                  },
-                },
-              },
-            });
-          }
-          return job;
-        }),
-      );
+      const updatedJobs = jobs;
 
       // Calculate pagination metadata
       const totalPages = Math.ceil(totalCount / limit);
@@ -527,35 +489,8 @@ export class JobsService {
         return sendResponse(HttpStatus.NOT_FOUND, false, 'Job not found', null);
       }
 
-      // AUTO-COMPLETE: Update job if time slot has ended
       let updatedJob = job;
-      if (
-        job.status === JobStatus.ASSIGNED &&
-        this.shouldAutoCompleteJob(job)
-      ) {
-        updatedJob = await this.prisma.job.update({
-          where: { id },
-          data: {
-            status: JobStatus.COMPLETED,
-            updatedAt: new Date(),
-          },
-          include: {
-            timeSlot: true,
-            technician: {
-              select: {
-                id: true,
-                name: true,
-                phone: true,
-                photo: true,
-                address: true,
-                workStartTime: true,
-                workEndTime: true,
-                isActive: true,
-              },
-            },
-          },
-        });
-      }
+      
 
       return sendResponse(
         HttpStatus.OK,

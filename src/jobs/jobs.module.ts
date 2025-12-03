@@ -9,7 +9,6 @@ import { NotificationPreferencesSeeder } from './seed/notification-preferences.s
 import { AddressParserUtil } from 'src/utils/address-parser.util';
 import { NotificationPreferencesModule } from 'src/notification-preferences/notification-preferences.module';
 import { MailService } from 'src/mail/mail.service';
-import { JobCompletionService } from './job-completion.service';
 import { ScheduleModule } from '@nestjs/schedule';
 import { JwtModule } from '@nestjs/jwt';
 
@@ -23,7 +22,6 @@ import { JwtModule } from '@nestjs/jwt';
   controllers: [JobsController],
   providers: [
     JobsService,
-    JobCompletionService,
     PrismaService,
     GeocoderUtil,
     TwilioUtil,
