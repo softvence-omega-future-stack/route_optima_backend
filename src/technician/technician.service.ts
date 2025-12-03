@@ -226,9 +226,7 @@ export class TechnicianService {
                 gte: todayStart,
                 lt: todayEnd,
               },
-              status: {
-                in: [JobStatus.ASSIGNED, JobStatus.COMPLETED],
-              },
+              status: JobStatus.ASSIGNED,
             },
           });
 
@@ -365,9 +363,7 @@ export class TechnicianService {
                 gte: todayStart,
                 lt: todayEnd,
               },
-              status: {
-                in: [JobStatus.ASSIGNED, JobStatus.COMPLETED],
-              },
+              status: JobStatus.ASSIGNED,
             },
           }),
 
@@ -507,9 +503,7 @@ export class TechnicianService {
               gte: todayStart,
               lt: todayEnd,
             },
-            status: {
-              in: [JobStatus.ASSIGNED, JobStatus.COMPLETED],
-            },
+            status: JobStatus.ASSIGNED,
           },
         }),
 

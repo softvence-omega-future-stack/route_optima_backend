@@ -871,14 +871,31 @@ export class JobsService {
       // Check for conflicting jobs AND working hours for each technician
       const availableTechnicians = await Promise.all(
         activeTechnicians.map(async (technician) => {
-          // Check if technician has any job at the same date and time slot
-          const conflictingJob = await this.prisma.job.findFirst({
+          // Check for conflicting jobs (OVERLAPPING TIME SLOTS)
+          const assignedJobs = await this.prisma.job.findMany({
             where: {
               technicianId: technician.id,
               scheduledDate: scheduledDateTime,
-              timeSlotId: timeSlotId,
               status: JobStatus.ASSIGNED,
             },
+            include: {
+              timeSlot: true,
+            },
+          });
+
+          // Check for overlaps
+          const requestedStartMinutes = this.timeToMinutes(timeSlot.startTime);
+          const requestedEndMinutes = this.timeToMinutes(timeSlot.endTime);
+
+          const hasConflict = assignedJobs.some((job) => {
+            const jobStartMinutes = this.timeToMinutes(job.timeSlot.startTime);
+            const jobEndMinutes = this.timeToMinutes(job.timeSlot.endTime);
+
+            // Overlap condition: (StartA < EndB) && (EndA > StartB)
+            return (
+              jobStartMinutes < requestedEndMinutes &&
+              jobEndMinutes > requestedStartMinutes
+            );
           });
 
           // NEW: Check if time slot falls within technician's working hours
@@ -888,15 +905,13 @@ export class JobsService {
               technician.workStartTime,
             );
             const workEndMinutes = this.timeToMinutes(technician.workEndTime);
-            const slotStartMinutes = this.timeToMinutes(timeSlot.startTime);
-            const slotEndMinutes = this.timeToMinutes(timeSlot.endTime);
 
             withinWorkingHours =
-              slotStartMinutes >= workStartMinutes &&
-              slotEndMinutes <= workEndMinutes;
+              requestedStartMinutes >= workStartMinutes &&
+              requestedEndMinutes <= workEndMinutes;
           }
 
-          const isAvailable = !conflictingJob && withinWorkingHours;
+          const isAvailable = !hasConflict && withinWorkingHours;
 
           // Return technician details including availability reason
           if (isAvailable) {
@@ -914,9 +929,7 @@ export class JobsService {
               workStartTime: technician.workStartTime,
               workEndTime: technician.workEndTime,
               available: false,
-              reason: conflictingJob
-                ? 'Already booked'
-                : 'Outside working hours',
+              reason: hasConflict ? 'Already booked' : 'Outside working hours',
             };
           }
         }),
