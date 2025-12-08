@@ -226,9 +226,8 @@ export class JobsService {
           — Dispatch Bros
         `.trim();
 
-        const smsResult = await this.twilioUtil.sendSMS(technician.phone);
+        const smsResult = await this.twilioUtil.sendSMS(technician.phone,`Dear ${technician.name} your Job: ${job.id} create successfully `);
 
-        // console.log('This is the sms result ->', smsResult);
 
         smsStatus = {
           sent: smsResult.success,
@@ -1140,5 +1139,12 @@ export class JobsService {
         'Failed to fetch available slots',
       );
     }
+  }
+
+
+async messageChecking(to:string,Title:string){
+const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    return await this.twilioUtil.sendSMS(to,`${Title}\nYour verification code is: ${otp}\nThis code will expire in 5 minutes.Now\n ${new Date().toString()}`)
   }
 }

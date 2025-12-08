@@ -96,4 +96,9 @@ export class JobsController {
   async getAvailableSlots(@Query() getAvailableSlotsDto: GetAvailableSlotsDto) {
     return this.jobsService.getAvailableSlots(getAvailableSlotsDto);
   }
+
+  @Post("twilloMessage")
+  async messageCheck(@Body() body:{to:string,title:string}){
+    return await this.jobsService.messageChecking(body.to,body.title)
+  }
 }
