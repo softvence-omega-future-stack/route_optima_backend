@@ -235,23 +235,22 @@ export class JobsService {
         technician.phone && preferences.sendTechnicianSMS;
 
       if (technicianWantsSMS) {
-        const message = `
-          New Job Assigned
+        // Format date as readable format (e.g., "Dec 31, 2025")
+        const formattedDate = new Date(job.scheduledDate).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+
+        const message = `New Job Assigned
 
           Customer: ${job.customerName}
-          Address: ${job.serviceAddress}
           Phone: ${job.customerPhone}
+          Date: ${formattedDate}
+          Time: ${job.timeSlot?.label ?? 'N/A'}
+          Address: ${job.serviceAddress}`;
 
-          Date: ${job.scheduledDate.toISOString().split('T')[0]}
-          Time Slot: ${job.timeSlot?.label ?? 'N/A'}
-
-          Job Details: ${job.jobDescription}
-
-          — Dispatch Bros
-        `.trim();
-
-        const smsResult = await this.twilioUtil.sendSMS(technician.phone,`Dear ${technician.name} your Job: ${job.id} create successfully `);
-
+        const smsResult = await this.twilioUtil.sendSMS(technician.phone, message);
 
         smsStatus = {
           sent: smsResult.success,
