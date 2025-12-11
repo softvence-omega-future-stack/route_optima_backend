@@ -1,4 +1,22 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateDispatcherDto } from './create-dispatcher.dto';
+import { IsOptional, IsString, IsBoolean } from 'class-validator';
 
-export class UpdateDispatcherDto extends PartialType(CreateDispatcherDto) {}
+export class UpdateDispatcherDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @IsOptional()
+  @IsString()
+  photo?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+}

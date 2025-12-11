@@ -1,12 +1,16 @@
-import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { PrismaService } from 'prisma/prisma.service';
 import { CreateDispatcherDto } from './dto/create-dispatcher.dto';
 import { UpdateDispatcherDto } from './dto/update-dispatcher.dto';
 import * as bcrypt from 'bcryptjs';
 import { MailService } from 'src/mail/mail.service';
+import { existsSync, unlinkSync } from 'fs';
+import { join } from 'path';
 
 @Injectable()
 export class DispatcherService {
+  private readonly logger = new Logger(DispatcherService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
@@ -250,8 +254,6 @@ export class DispatcherService {
       where: { id },
       include: {
         user: { select: { id: true, email: true, role: true } },
-        jobs: { take: 10, orderBy: { createdAt: 'desc' } },
-        _count: { select: { jobs: true } },
       },
     });
 
@@ -259,14 +261,96 @@ export class DispatcherService {
       throw new NotFoundException('Dispatcher not found');
     }
 
+    // Calculate date ranges for statistics
+    const now = new Date();
+    
+    // This week (Sunday to Saturday)
+    const startOfWeek = new Date(now);
+    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setDate(now.getDate() - now.getDay()); // Go to Sunday
+    
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
+
+    // This month
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    // Fetch jobs created by this dispatcher and calculate statistics
+    let jobs: any[] = [];
+    let jobsThisWeek = 0;
+    let jobsThisMonth = 0;
+    let totalJobs = 0;
+
+    if (dispatcher.user) {
+      [jobs, jobsThisWeek, jobsThisMonth, totalJobs] = await Promise.all([
+        // Fetch recent jobs created by this user with full details
+        this.prisma.job.findMany({
+          where: {
+            createdBy: dispatcher.user.id,
+          },
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            technician: { select: { id: true, name: true, phone: true } },
+            timeSlot: { select: { id: true, label: true, startTime: true, endTime: true } },
+          },
+        }),
+        // Jobs created this week by this user
+        this.prisma.job.count({
+          where: {
+            createdBy: dispatcher.user.id,
+            createdAt: {
+              gte: startOfWeek,
+              lt: endOfWeek,
+            },
+          },
+        }),
+        // Jobs created this month by this user
+        this.prisma.job.count({
+          where: {
+            createdBy: dispatcher.user.id,
+            createdAt: {
+              gte: startOfMonth,
+              lte: endOfMonth,
+            },
+          },
+        }),
+        // Total jobs created by this user
+        this.prisma.job.count({
+          where: {
+            createdBy: dispatcher.user.id,
+          },
+        }),
+      ]);
+    }
+
     return {
       success: true,
       message: 'Dispatcher retrieved successfully',
-      data: dispatcher,
+      data: {
+        ...dispatcher,
+        jobs,
+        jobsThisWeek,
+        jobsThisMonth,
+        totalJobs,
+      },
     };
   }
 
   async updateDispatcher(id: string, updateDto: UpdateDispatcherDto) {
+    // If a new photo is being uploaded, delete the old one first
+    if (updateDto.photo) {
+      const existingDispatcher = await this.prisma.dispatcher.findUnique({
+        where: { id },
+        select: { photo: true },
+      });
+
+      if (existingDispatcher?.photo) {
+        this.deletePhotoFile(existingDispatcher.photo);
+      }
+    }
+
     const dispatcher = await this.prisma.dispatcher.update({
       where: { id },
       data: updateDto,
@@ -281,7 +365,7 @@ export class DispatcherService {
   }
 
   async deleteDispatcher(id: string) {
-    // First, get the dispatcher to find the associated user
+    // First, get the dispatcher to find the associated user and photo
     const dispatcher = await this.prisma.dispatcher.findUnique({
       where: { id },
       include: { user: true },
@@ -289,6 +373,11 @@ export class DispatcherService {
 
     if (!dispatcher) {
       throw new NotFoundException('Dispatcher not found');
+    }
+
+    // Delete the photo file if it exists
+    if (dispatcher.photo) {
+      this.deletePhotoFile(dispatcher.photo);
     }
 
     // Delete both dispatcher and user in a transaction
@@ -306,6 +395,24 @@ export class DispatcherService {
       success: true,
       message: 'Dispatcher deleted successfully',
     };
+  }
+
+  private deletePhotoFile(photoPath: string | null) {
+    if (!photoPath) return;
+
+    try {
+      const filename = photoPath.replace('/uploads/', '');
+      const fullPath = join(__dirname, '..', '..', 'uploads', filename);
+
+      if (existsSync(fullPath)) {
+        unlinkSync(fullPath);
+        this.logger.log(`Photo deleted: ${fullPath}`);
+      } else {
+        this.logger.warn(`Photo not found: ${fullPath}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to delete photo:', error);
+    }
   }
 
   async getDispatcherStats(dispatcherId: string) {

@@ -10,6 +10,8 @@ import {
   UseGuards,
   HttpStatus,
   Res,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import { DispatcherService } from './dispatcher.service';
 import { CreateDispatcherDto } from './dto/create-dispatcher.dto';
@@ -20,20 +22,47 @@ import { AuthRoles } from 'src/common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { sendResponse } from 'src/lib/responseHandler';
 import { Response } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
 
 @Controller('api/v1/dispatcher')
 export class DispatcherController {
   constructor(private readonly dispatcherService: DispatcherService) {}
 
   @Post('create')
+  @UseInterceptors(
+    FileInterceptor('photo', {
+      storage: diskStorage({
+        destination: join(__dirname, '..', '..', 'uploads'),
+        filename: (req, file, cb) => {
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+    }),
+  )
   @UseGuards(AuthGuard, RolesGuard)
   @AuthRoles(UserRole.ADMIN)
-  async create(@Body() createDto: CreateDispatcherDto, @Res() res: Response) {
+  async create(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('data') data: string,
+    @Res() res: Response,
+  ) {
     try {
-      // Extract mailToDispatcher from body (not part of DTO)
-      const mailToDispatcher = (createDto as any).mailToDispatcher === true;
+      // Parse the JSON string
+      const dispatcherData: CreateDispatcherDto = JSON.parse(data);
+
+      // Add the photo path if uploaded
+      if (file) {
+        dispatcherData.photo = `/uploads/${file.filename}`;
+      }
+
+      // Extract mailToDispatcher from parsed data (not part of DTO)
+      const mailToDispatcher = (dispatcherData as any).mailToDispatcher === true;
       
-      const result = await this.dispatcherService.createDispatcher(createDto, mailToDispatcher);
+      const result = await this.dispatcherService.createDispatcher(dispatcherData, mailToDispatcher);
       return sendResponse(
         HttpStatus.CREATED,
         true,
@@ -43,6 +72,16 @@ export class DispatcherController {
         res,
       );
     } catch (error) {
+      if (error instanceof SyntaxError) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          'Invalid JSON data provided',
+          null,
+          null,
+          res,
+        );
+      }
       return sendResponse(
         HttpStatus.BAD_REQUEST,
         false,
@@ -85,7 +124,7 @@ export class DispatcherController {
 
   @Get(':id')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
+  @AuthRoles(UserRole.ADMIN, UserRole.DISPATCHER)
   async getDispatcherById(@Param('id') id: string, @Res() res: Response) {
     try {
       const result = await this.dispatcherService.getDispatcherById(id);
@@ -110,24 +149,59 @@ export class DispatcherController {
   }
 
   @Patch('update/:id')
+  @UseInterceptors(
+    FileInterceptor('photo', {
+      storage: diskStorage({
+        destination: join(__dirname, '..', '..', 'uploads'),
+        filename: (req, file, cb) => {
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+    }),
+  )
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
-  async updateDispatcher(
+  @AuthRoles(UserRole.ADMIN, UserRole.DISPATCHER)
+  async update(
     @Param('id') id: string,
-    @Body() updateDto: UpdateDispatcherDto,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('data') data: string,
     @Res() res: Response,
   ) {
     try {
-      const result = await this.dispatcherService.updateDispatcher(id, updateDto);
+      // Parse the JSON string
+      const dispatcherData: UpdateDispatcherDto = data ? JSON.parse(data) : {};
+
+      // Add the photo path if uploaded
+      if (file) {
+        dispatcherData.photo = `/uploads/${file.filename}`;
+      }
+
+      // Explicitly remove email and password if somehow included
+      delete (dispatcherData as any).email;
+      delete (dispatcherData as any).password;
+
+      const result = await this.dispatcherService.updateDispatcher(id, dispatcherData);
       return sendResponse(
         HttpStatus.OK,
-        result.success,
+        true,
         result.message,
         result.data,
         null,
         res,
       );
     } catch (error) {
+       if (error instanceof SyntaxError) {
+        return sendResponse(
+          HttpStatus.BAD_REQUEST,
+          false,
+          'Invalid JSON data provided',
+          null,
+          null,
+          res,
+        );
+      }
       return sendResponse(
         HttpStatus.BAD_REQUEST,
         false,
