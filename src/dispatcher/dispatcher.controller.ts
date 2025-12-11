@@ -65,7 +65,10 @@ export class DispatcherController {
         true,
         'Dispatchers retrieved successfully',
         result.dispatchers,
-        result.meta,
+        {
+          statistics: result.statistics,
+          ...result.meta,
+        },
         res,
       );
     } catch (error) {

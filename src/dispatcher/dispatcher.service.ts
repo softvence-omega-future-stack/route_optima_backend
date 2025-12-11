@@ -133,8 +133,109 @@ export class DispatcherService {
       this.prisma.dispatcher.count({ where }),
     ]);
 
+    // Calculate date ranges for statistics
+    const now = new Date();
+    
+    // This week (Sunday to Saturday)
+    const startOfWeek = new Date(now);
+    startOfWeek.setHours(0, 0, 0, 0);
+    startOfWeek.setDate(now.getDate() - now.getDay()); // Go to Sunday
+    
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 7);
+
+    // This month
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    // Add job statistics for each dispatcher
+    const dispatchersWithStats = await Promise.all(
+      dispatchers.map(async (dispatcher) => {
+        if (!dispatcher.user) {
+          return {
+            ...dispatcher,
+            jobsThisWeek: 0,
+            jobsThisMonth: 0,
+            totalJobs: dispatcher._count.jobs,
+          };
+        }
+
+        const [jobsThisWeek, jobsThisMonth] = await Promise.all([
+          // Jobs created this week by this user
+          this.prisma.job.count({
+            where: {
+              createdBy: dispatcher.user.id,
+              createdAt: {
+                gte: startOfWeek,
+                lt: endOfWeek,
+              },
+            },
+          }),
+          // Jobs created this month by this user
+          this.prisma.job.count({
+            where: {
+              createdBy: dispatcher.user.id,
+              createdAt: {
+                gte: startOfMonth,
+                lte: endOfMonth,
+              },
+            },
+          }),
+        ]);
+
+        // Total jobs created by this user
+        const totalJobs = await this.prisma.job.count({
+          where: {
+            createdBy: dispatcher.user.id,
+          },
+        });
+
+        return {
+          ...dispatcher,
+          jobsThisWeek,
+          jobsThisMonth,
+          totalJobs,
+        };
+      }),
+    );
+
+    // Calculate overall statistics
+    const [totalJobsThisWeek, totalJobsThisMonth, totalJobsOverall, activeDispatchers] = await Promise.all([
+      // Total jobs created this week by all dispatchers
+      this.prisma.job.count({
+        where: {
+          createdAt: {
+            gte: startOfWeek,
+            lt: endOfWeek,
+          },
+        },
+      }),
+      // Total jobs created this month by all dispatchers
+      this.prisma.job.count({
+        where: {
+          createdAt: {
+            gte: startOfMonth,
+            lte: endOfMonth,
+          },
+        },
+      }),
+      // Total jobs overall
+      this.prisma.job.count(),
+      // Active dispatchers count
+      this.prisma.dispatcher.count({
+        where: { isActive: true },
+      }),
+    ]);
+
     return {
-      dispatchers,
+      statistics: {
+        totalDispatchers: total,
+        activeNow: activeDispatchers,
+        jobsThisWeek: totalJobsThisWeek,
+        jobsThisMonth: totalJobsThisMonth,
+        totalJobs: totalJobsOverall,
+      },
+      dispatchers: dispatchersWithStats,
       meta: {
         total,
         page: parseInt(page),
