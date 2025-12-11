@@ -75,7 +75,7 @@ export class AuthController {
       //   httpOnly: true,
       //   secure: true,
       //   sameSite: 'strict',
-      //   maxAge: 1000 * 60 * 60 * 24 * 7, 
+      //   maxAge: 1000 * 60 * 60 * 24 * 7,
       // });
 
       return {
@@ -97,25 +97,27 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
-  async getCurrentAdmin(@CurrentUser() user) {
+  @AuthRoles(UserRole.ADMIN, UserRole.DISPATCHER)
+  async getCurrentUser(@CurrentUser() user) {
     try {
       if (!user || !user.id) {
         throw new UnauthorizedException('User not authenticated');
       }
-      const admin = await this.authService.getCurrentAdmin(user.id);
+
+      const data = await this.authService.getCurrentUser(user.id);
+
       return sendResponse(
         HttpStatus.OK,
         true,
-        'Current admin fetched successfully',
-        admin,
+        'Current user fetched successfully',
+        data,
       );
     } catch (error) {
       const status = error.status || HttpStatus.BAD_REQUEST;
       return sendResponse(
         status,
         false,
-        'Failed to get current admin',
+        'Failed to get current user',
         error.message || error,
       );
     }
@@ -131,7 +133,6 @@ export class AuthController {
       accessToken,
     };
   }
-
 
   @Post('logout')
   @HttpCode(200)

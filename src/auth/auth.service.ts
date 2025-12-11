@@ -101,7 +101,12 @@ export class AuthService {
     // Check session limit (allow max 100 simultaneous sessions)
     await this.enforceSessionLimit(user.id, 100);
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role, user.dispatcher?.id);
+    const tokens = await this.generateTokens(
+      user.id,
+      user.email,
+      user.role,
+      user.dispatcher?.id,
+    );
     await this.createSession(user.id, tokens.refreshToken);
 
     return {
@@ -110,14 +115,19 @@ export class AuthService {
       refreshToken: tokens.refreshToken,
     };
   }
-  async getCurrentAdmin(userId: string) {
+  async getCurrentUser(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
-    if (!user) throw new UnauthorizedException('Admin not found');
-    if (user.role !== 'ADMIN')
-      throw new UnauthorizedException('Access denied: not an admin');
+    if (!user) throw new UnauthorizedException('User not found');
+
+    // Allow ADMIN or DISPATCHER
+    if (user.role !== 'ADMIN' && user.role !== 'DISPATCHER') {
+      throw new UnauthorizedException(
+        'Access denied: only admin or dispatcher can access this resource',
+      );
+    }
 
     return this.excludePassword(user);
   }
@@ -326,7 +336,12 @@ export class AuthService {
   }
 
   // * generate token
-  private async generateTokens(userId: string, email: string, role: string, dispatcherId?: string) {
+  private async generateTokens(
+    userId: string,
+    email: string,
+    role: string,
+    dispatcherId?: string,
+  ) {
     const payload: any = {
       sub: userId, // Use 'sub' instead of 'id'
       email,
