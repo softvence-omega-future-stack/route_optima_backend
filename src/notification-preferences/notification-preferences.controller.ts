@@ -37,7 +37,7 @@ export class NotificationPreferencesController {
 
   @Patch('sms')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.DISPATCHER)
+  @AuthRoles(UserRole.DISPATCHER, UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   async updateSmsPreference(@Body() updateDto: UpdateSmsPreferenceDto) {
     try {
@@ -63,7 +63,7 @@ export class NotificationPreferencesController {
 
   @Patch('email')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.DISPATCHER)
+  @AuthRoles(UserRole.DISPATCHER, UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   async updateEmailPreference(@Body() updateDto: UpdateEmailPreferenceDto) {
     try {

@@ -30,11 +30,12 @@ export class JobsController {
 
   @Post('add-job')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.DISPATCHER)
+  @AuthRoles(UserRole.ADMIN, UserRole.DISPATCHER)
   @HttpCode(201)
   async create(@Body() createJobDto: CreateJobDto, @Request() req: any) {
     const dispatcherId = req.user?.dispatcherId;
-    return this.jobsService.createJob(createJobDto, dispatcherId);
+    const userId = req.user?.sub || req.user?.id; // Get user ID from JWT
+    return this.jobsService.createJob(createJobDto, dispatcherId, userId);
   }
 
   // get all job

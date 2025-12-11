@@ -42,6 +42,7 @@ model User {
 
   sessions           Session[]
   PasswordResetToken PasswordResetToken[]
+  createdJobs        Job[]                @relation("JobCreator")
 }
 
 // Model for managing long-term user sessions and tokens.
@@ -146,6 +147,10 @@ model Job {
   // Dispatcher tracking
   dispatcherId                                  String?
   dispatcher                                    Dispatcher?     @relation("DispatcherJobs", fields: [dispatcherId], references: [id])
+
+  // Creator tracking - who created this job (admin or dispatcher)
+  createdBy                                     String?
+  creator                                       User?           @relation("JobCreator", fields: [createdBy], references: [id])
 
   status                                        JobStatus        @default(ASSIGNED)
   createdAt                                     DateTime         @default(now())

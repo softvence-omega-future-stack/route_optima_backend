@@ -36,7 +36,7 @@ export class JobsService {
 
 
 
-  async createJob(createJobDto: CreateJobDto, dispatcherId?: string) {
+  async createJob(createJobDto: CreateJobDto, dispatcherId?: string, userId?: string) {
     try {
       this.logger.log('Creating new job...');
 
@@ -172,6 +172,7 @@ export class JobsService {
           timeSlotId: createJobDto.timeSlotId,
           technicianId: createJobDto.technicianId,
           dispatcherId: dispatcherId || null,
+          createdBy: userId || null, // Track who created this job
 
           latitude: latitude ?? null,
           longitude: longitude ?? null,
@@ -179,7 +180,14 @@ export class JobsService {
         include: {
           timeSlot: true,
           technician: true,
-          dispatcher: true,
+          creator: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
+          },
         },
       });
 
@@ -413,10 +421,12 @@ export class JobsService {
               isActive: true,
             },
           },
-          dispatcher: {
+          creator: {
             select: {
               id: true,
               name: true,
+              email: true,
+              role: true,
             },
           },
         },
@@ -487,6 +497,14 @@ export class JobsService {
               workStartTime: true,
               workEndTime: true,
               isActive: true,
+            },
+          },
+          creator: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
             },
           },
         },
