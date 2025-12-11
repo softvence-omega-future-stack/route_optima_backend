@@ -16,6 +16,7 @@ generator client {
 enum UserRole {
   ADMIN
   TECHNICIAN
+  DISPATCHER
 }
 
 enum JobStatus {
@@ -29,15 +30,19 @@ model User {
   password           String
   name               String?
   photo              String?
-  role               UserRole              @default(ADMIN)
+  role               UserRole              @default(DISPATCHER)
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
 
   technicianId       String?               @unique
   technician         Technician?          @relation(fields: [technicianId], references: [id])
 
+  dispatcherId       String?               @unique
+  dispatcher         Dispatcher?          @relation(fields: [dispatcherId], references: [id])
+
   sessions           Session[]
   PasswordResetToken PasswordResetToken[]
+  createdJobs        Job[]                @relation("JobCreator")
 }
 
 // Model for managing long-term user sessions and tokens.
@@ -82,6 +87,22 @@ model Technician {
   updatedAt     DateTime  @updatedAt
 }
 
+// Model for managing dispatchers
+model Dispatcher {
+  id            String    @id @default(uuid())
+  name          String
+  phone         String?   @unique
+  address       String?
+  photo         String?
+  isActive      Boolean   @default(true)
+
+  user          User?
+
+  jobs          Job[]     @relation("DispatcherJobs")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
 model DefaultTimeSlot {
   id                                                   String    @id @default(uuid())
   label                                                String
@@ -122,6 +143,14 @@ model Job {
   timeSlot                                      DefaultTimeSlot @relation(fields: [timeSlotId], references: [id])
   technicianId                                  String
   technician                                    Technician      @relation(fields: [technicianId], references: [id], onDelete: Cascade)
+
+  // Dispatcher tracking
+  dispatcherId                                  String?
+  dispatcher                                    Dispatcher?     @relation("DispatcherJobs", fields: [dispatcherId], references: [id])
+
+  // Creator tracking - who created this job (admin or dispatcher)
+  createdBy                                     String?
+  creator                                       User?           @relation("JobCreator", fields: [createdBy], references: [id])
 
   status                                        JobStatus        @default(ASSIGNED)
   createdAt                                     DateTime         @default(now())

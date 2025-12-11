@@ -46,7 +46,7 @@ export class TechnicianController {
     }),
   )
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
+  @AuthRoles(UserRole.DISPATCHER)
   async addTechnician(
     @UploadedFile() file: Express.Multer.File,
     @Body('data') data: string,
@@ -73,7 +73,7 @@ export class TechnicianController {
 
   @Get('all-technicians')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
+  @AuthRoles(UserRole.ADMIN, UserRole.DISPATCHER)
   async getAllTechnicians(
     @Query() query: GetAllTechniciansDto,
     @Res() res: Response,
@@ -109,7 +109,7 @@ export class TechnicianController {
 
   @Get('single/:id')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
+  @AuthRoles(UserRole.ADMIN, UserRole.DISPATCHER)
   async getTechnicianById(@Param('id') id: string, @Res() res: Response) {
     try {
       const result = await this.technicianService.getTechnicianById(id);
@@ -160,7 +160,7 @@ export class TechnicianController {
 
   @Get('single/details/:id')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
+  @AuthRoles(UserRole.ADMIN, UserRole.DISPATCHER)
   async getTechnicianDetailsById(
     @Param('id') id: string,
     @Res() res: Response,
@@ -226,7 +226,7 @@ export class TechnicianController {
     }),
   )
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
+  @AuthRoles(UserRole.DISPATCHER)
   async updateTechnician(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
@@ -293,7 +293,7 @@ export class TechnicianController {
 
   @Delete('delete-technician/:id')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
+  @AuthRoles(UserRole.DISPATCHER)
   async deleteTechnician(@Param('id') id: string, @Res() res: Response) {
     try {
       const result = await this.technicianService.deleteTechnician(id);

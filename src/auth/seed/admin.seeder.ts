@@ -9,10 +9,10 @@ interface AdminData {
 }
 
 @Injectable()
-export class AdminSeeder implements OnModuleInit {
-  private readonly logger = new Logger(AdminSeeder.name);
+export class DispatcherSeeder implements OnModuleInit {
+  private readonly logger = new Logger(DispatcherSeeder.name);
 
-  private readonly defaultAdmin: AdminData = {
+  private readonly defaultDispatcher: AdminData = {
     name: "Dispatch Bros",
     email: "dispatchbros444@gmail.com",
     password: "admin123",
@@ -21,45 +21,45 @@ export class AdminSeeder implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit() {
-    await this.seedAdmin();
+    await this.seedDispatcher();
   }
 
-  private async seedAdmin() {
+  private async seedDispatcher() {
     try {
-      // Check if admin already exists
-      const existingAdmin = await this.prisma.user.findUnique({
-        where: { email: this.defaultAdmin.email }
+      // Check if dispatcher already exists
+      const existingDispatcher = await this.prisma.user.findUnique({
+        where: { email: this.defaultDispatcher.email }
       });
 
-      if (existingAdmin) {
-        this.logger.log('ℹ️ Default admin already exists');
+      if (existingDispatcher) {
+        this.logger.log('ℹ️ Default dispatcher already exists');
         return;
       }
 
-      this.logger.log('👑 Creating default admin user...');
+      this.logger.log('👑 Creating default dispatcher user...');
 
       // Hash password
-      const hashedPassword = await bcrypt.hash(this.defaultAdmin.password, 12);
+      const hashedPassword = await bcrypt.hash(this.defaultDispatcher.password, 12);
 
-      // Create admin user
-      const admin = await this.prisma.user.create({
+      // Create dispatcher user
+      const dispatcher = await this.prisma.user.create({
         data: {
-          name: this.defaultAdmin.name,
-          email: this.defaultAdmin.email,
+          name: this.defaultDispatcher.name,
+          email: this.defaultDispatcher.email,
           password: hashedPassword,
-          role: 'ADMIN',
+          role: 'DISPATCHER',
           photo: null,
         },
       });
 
-      this.logger.log('Default admin created successfully!');
-      this.logger.log(`Name: ${admin.name}`);
-      this.logger.log(`Email: ${admin.email}`);
-      this.logger.log(`Role: ${admin.role}`);
-      this.logger.log(`ID: ${admin.id}`);
+      this.logger.log('Default dispatcher created successfully!');
+      this.logger.log(`Name: ${dispatcher.name}`);
+      this.logger.log(`Email: ${dispatcher.email}`);
+      this.logger.log(`Role: ${dispatcher.role}`);
+      this.logger.log(`ID: ${dispatcher.id}`);
 
     } catch (error) {
-      this.logger.error('❌ Error seeding default admin:', error);
+      this.logger.error('❌ Error seeding default dispatcher:', error);
     }
   }
 }

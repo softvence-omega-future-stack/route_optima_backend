@@ -5,11 +5,16 @@ import {
   Body, 
   HttpCode, 
   HttpStatus,
-  ConflictException 
+  ConflictException,
+  UseGuards 
 } from '@nestjs/common';
 import { NotificationPreferencesService } from './notification-preferences.service';
 import { UpdateSmsPreferenceDto } from './dto/update-sms-preference.dto';
 import { UpdateEmailPreferenceDto } from './dto/update-email-preference.dto';
+import { AuthGuard } from 'src/auth/guards/jwt-auth-guard';
+import { RolesGuard } from 'src/auth/guards/role-guard';
+import { AuthRoles } from 'src/common/decorators/roles.decorator';
+import { UserRole } from '@prisma/client';
 
 @Controller('api/v1/notification-preferences')
 export class NotificationPreferencesController {
@@ -18,6 +23,8 @@ export class NotificationPreferencesController {
   ) {}
 
   @Get()
+  @UseGuards(AuthGuard, RolesGuard)
+  @AuthRoles(UserRole.ADMIN, UserRole.DISPATCHER)
   @HttpCode(HttpStatus.OK)
   async getPreferences() {
     const preferences = await this.notificationPreferencesService.getPreferences();
@@ -29,6 +36,8 @@ export class NotificationPreferencesController {
   }
 
   @Patch('sms')
+  @UseGuards(AuthGuard, RolesGuard)
+  @AuthRoles(UserRole.DISPATCHER, UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   async updateSmsPreference(@Body() updateDto: UpdateSmsPreferenceDto) {
     try {
@@ -53,6 +62,8 @@ export class NotificationPreferencesController {
   }
 
   @Patch('email')
+  @UseGuards(AuthGuard, RolesGuard)
+  @AuthRoles(UserRole.DISPATCHER, UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   async updateEmailPreference(@Body() updateDto: UpdateEmailPreferenceDto) {
     try {

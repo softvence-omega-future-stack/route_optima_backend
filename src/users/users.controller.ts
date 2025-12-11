@@ -12,7 +12,7 @@ export class UsersController {
 
   @Get()
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
+  @AuthRoles(UserRole.ADMIN, UserRole.DISPATCHER)
   async findAll() {
     try {
       const result = await this.usersService.findAll();

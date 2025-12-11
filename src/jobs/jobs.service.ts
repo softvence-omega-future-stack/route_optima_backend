@@ -36,7 +36,7 @@ export class JobsService {
 
 
 
-  async createJob(createJobDto: CreateJobDto) {
+  async createJob(createJobDto: CreateJobDto, dispatcherId?: string, userId?: string) {
     try {
       this.logger.log('Creating new job...');
 
@@ -54,6 +54,20 @@ export class JobsService {
           false,
           'Time slot ID is required',
         );
+      }
+
+      // Validate userId if provided
+      let validatedUserId: string | null = null;
+      if (userId) {
+        const userExists = await this.prisma.user.findUnique({
+          where: { id: userId },
+        });
+        
+        if (userExists) {
+          validatedUserId = userId;
+        } else {
+          this.logger.warn(`User ID ${userId} not found in database, setting createdBy to null`);
+        }
       }
 
       const technician = await this.prisma.technician.findUnique({
@@ -171,6 +185,8 @@ export class JobsService {
 
           timeSlotId: createJobDto.timeSlotId,
           technicianId: createJobDto.technicianId,
+          dispatcherId: dispatcherId || null,
+          createdBy: validatedUserId, // Use validated user ID
 
           latitude: latitude ?? null,
           longitude: longitude ?? null,
@@ -178,6 +194,14 @@ export class JobsService {
         include: {
           timeSlot: true,
           technician: true,
+          creator: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
+          },
         },
       });
 
@@ -211,23 +235,22 @@ export class JobsService {
         technician.phone && preferences.sendTechnicianSMS;
 
       if (technicianWantsSMS) {
-        const message = `
-          New Job Assigned
+        // Format date as readable format (e.g., "Dec 31, 2025")
+        const formattedDate = new Date(job.scheduledDate).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+
+        const message = `New Job Assigned
 
           Customer: ${job.customerName}
-          Address: ${job.serviceAddress}
           Phone: ${job.customerPhone}
+          Date: ${formattedDate}
+          Time: ${job.timeSlot?.label ?? 'N/A'}
+          Address: ${job.serviceAddress}`;
 
-          Date: ${job.scheduledDate.toISOString().split('T')[0]}
-          Time Slot: ${job.timeSlot?.label ?? 'N/A'}
-
-          Job Details: ${job.jobDescription}
-
-          — Dispatch Bros
-        `.trim();
-
-        const smsResult = await this.twilioUtil.sendSMS(technician.phone,`Dear ${technician.name} your Job: ${job.id} create successfully `);
-
+        const smsResult = await this.twilioUtil.sendSMS(technician.phone, message);
 
         smsStatus = {
           sent: smsResult.success,
@@ -411,6 +434,14 @@ export class JobsService {
               isActive: true,
             },
           },
+          creator: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+            },
+          },
         },
         orderBy: {
           createdAt: 'desc',
@@ -479,6 +510,14 @@ export class JobsService {
               workStartTime: true,
               workEndTime: true,
               isActive: true,
+            },
+          },
+          creator: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
             },
           },
         },

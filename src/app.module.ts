@@ -10,6 +10,7 @@ import { TechnicianModule } from './technician/technician.module';
 import { DefaultTimeSlotModule } from './default-time-slot/default-time-slot.module';
 import { NotificationPreferencesModule } from './notification-preferences/notification-preferences.module';
 import { CredentialsModule } from './credentials/credentials.module';
+import { DispatcherModule } from './dispatcher/dispatcher.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { CredentialsModule } from './credentials/credentials.module';
     DefaultTimeSlotModule,
     NotificationPreferencesModule,
     CredentialsModule,
+    DispatcherModule,
   ],
   controllers: [AppController],
   providers: [AppService],
