@@ -56,6 +56,20 @@ export class JobsService {
         );
       }
 
+      // Validate userId if provided
+      let validatedUserId: string | null = null;
+      if (userId) {
+        const userExists = await this.prisma.user.findUnique({
+          where: { id: userId },
+        });
+        
+        if (userExists) {
+          validatedUserId = userId;
+        } else {
+          this.logger.warn(`User ID ${userId} not found in database, setting createdBy to null`);
+        }
+      }
+
       const technician = await this.prisma.technician.findUnique({
         where: { id: createJobDto.technicianId },
       });
@@ -172,7 +186,7 @@ export class JobsService {
           timeSlotId: createJobDto.timeSlotId,
           technicianId: createJobDto.technicianId,
           dispatcherId: dispatcherId || null,
-          createdBy: userId || null, // Track who created this job
+          createdBy: validatedUserId, // Use validated user ID
 
           latitude: latitude ?? null,
           longitude: longitude ?? null,

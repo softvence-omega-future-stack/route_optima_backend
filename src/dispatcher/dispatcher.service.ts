@@ -380,20 +380,46 @@ export class DispatcherService {
       this.deletePhotoFile(dispatcher.photo);
     }
 
-    // Delete both dispatcher and user in a transaction
+    // Delete dispatcher, user, and all related records in a transaction
     await this.prisma.$transaction(async (prisma) => {
-      // Delete dispatcher first
-      await prisma.dispatcher.delete({ where: { id } });
-
-      // Delete associated user if exists
       if (dispatcher.user) {
-        await prisma.user.delete({ where: { id: dispatcher.user.id } });
+        const userId = dispatcher.user.id;
+
+        // 1. Delete all sessions for this user
+        await prisma.session.deleteMany({
+          where: { userId },
+        });
+
+        // 2. Delete all password reset tokens for this user
+        await prisma.passwordResetToken.deleteMany({
+          where: { userId },
+        });
+
+        // 3. Update jobs created by this user (set createdBy to null instead of deleting)
+        await prisma.job.updateMany({
+          where: { createdBy: userId },
+          data: { createdBy: null },
+        });
+
+        // 4. Delete jobs assigned to this dispatcher (if any)
+        await prisma.job.deleteMany({
+          where: { dispatcherId: id },
+        });
+
+        // 5. Delete the dispatcher
+        await prisma.dispatcher.delete({ where: { id } });
+
+        // 6. Finally, delete the user
+        await prisma.user.delete({ where: { id: userId } });
+      } else {
+        // If no user associated, just delete the dispatcher
+        await prisma.dispatcher.delete({ where: { id } });
       }
     });
 
     return {
       success: true,
-      message: 'Dispatcher deleted successfully',
+      message: 'Dispatcher and all related records deleted successfully',
     };
   }
 
