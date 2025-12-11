@@ -36,7 +36,7 @@ export class JobsService {
 
 
 
-  async createJob(createJobDto: CreateJobDto) {
+  async createJob(createJobDto: CreateJobDto, dispatcherId?: string) {
     try {
       this.logger.log('Creating new job...');
 
@@ -171,6 +171,7 @@ export class JobsService {
 
           timeSlotId: createJobDto.timeSlotId,
           technicianId: createJobDto.technicianId,
+          dispatcherId: dispatcherId || null,
 
           latitude: latitude ?? null,
           longitude: longitude ?? null,
@@ -178,6 +179,7 @@ export class JobsService {
         include: {
           timeSlot: true,
           technician: true,
+          dispatcher: true,
         },
       });
 
@@ -409,6 +411,12 @@ export class JobsService {
               photo: true,
               address: true,
               isActive: true,
+            },
+          },
+          dispatcher: {
+            select: {
+              id: true,
+              name: true,
             },
           },
         },

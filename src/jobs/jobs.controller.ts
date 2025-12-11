@@ -10,6 +10,7 @@ import {
   Post,
   Query,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { CreateJobDto } from './dto/create-job.dto';
 import { JobsService } from './jobs.service';
@@ -29,16 +30,17 @@ export class JobsController {
 
   @Post('add-job')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
+  @AuthRoles(UserRole.DISPATCHER)
   @HttpCode(201)
-  async create(@Body() createJobDto: CreateJobDto) {
-    return this.jobsService.createJob(createJobDto);
+  async create(@Body() createJobDto: CreateJobDto, @Request() req: any) {
+    const dispatcherId = req.user?.dispatcherId;
+    return this.jobsService.createJob(createJobDto, dispatcherId);
   }
 
   // get all job
   @Get()
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
+  @AuthRoles(UserRole.ADMIN, UserRole.DISPATCHER)
   @HttpCode(200)
   async getAllJobs(@Query() getJobsDto: GetJobsDto) {
     return this.jobsService.getAllJobs(getJobsDto);
@@ -46,7 +48,7 @@ export class JobsController {
 
   @Get('single/:id')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
+  @AuthRoles(UserRole.ADMIN, UserRole.DISPATCHER)
   @HttpCode(200)
   async getJobById(@Param('id') id: string) {
     return this.jobsService.getJobById(id);
@@ -55,7 +57,7 @@ export class JobsController {
   // update job (status update included)
   @Patch('update/:id')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
+  @AuthRoles(UserRole.DISPATCHER)
   @HttpCode(200)
   async updateJob(@Param('id') id: string, @Body() updateJobDto: UpdateJobDto) {
     return this.jobsService.updateJob(id, updateJobDto);
@@ -63,7 +65,7 @@ export class JobsController {
 
   @Delete('delete/:id')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
+  @AuthRoles(UserRole.DISPATCHER)
   @HttpCode(200)
   async deleteJob(@Param('id') id: string) {
     return this.jobsService.deleteJob(id);
@@ -72,7 +74,7 @@ export class JobsController {
   // job statistics
   @Get('stats')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
+  @AuthRoles(UserRole.ADMIN, UserRole.DISPATCHER)
   @HttpCode(200)
   async getJobStats(@Query() getStatsDto: GetStatsDto) {
     return this.jobsService.getJobStats(getStatsDto);
@@ -81,7 +83,7 @@ export class JobsController {
   // available technicians for a job
   @Get('available-technicians')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
+  @AuthRoles(UserRole.ADMIN, UserRole.DISPATCHER)
   @HttpCode(200)
   async getAvailableTechnicians(
     @Query() getAvailableTechniciansDto: GetAvailableTechniciansDto,
@@ -91,7 +93,7 @@ export class JobsController {
 
   @Get('available-slots')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.ADMIN)
+  @AuthRoles(UserRole.ADMIN, UserRole.DISPATCHER)
   @HttpCode(200)
   async getAvailableSlots(@Query() getAvailableSlotsDto: GetAvailableSlotsDto) {
     return this.jobsService.getAvailableSlots(getAvailableSlotsDto);

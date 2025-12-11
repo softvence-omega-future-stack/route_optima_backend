@@ -25,7 +25,7 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto) {
-    const { email, password, name, photo } = registerDto;
+    const { email, password, name, photo, role } = registerDto;
 
     // Check if user already exists
     const existingUser = await this.prisma.user.findUnique({
@@ -39,16 +39,34 @@ export class AuthService {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create user
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name,
-        role: 'ADMIN',
-        photo: photo || null,
-      },
-    });
+    // Create user with dispatcher profile if role is DISPATCHER
+    const userData = {
+      email,
+      password: hashedPassword,
+      name,
+      role: role || 'DISPATCHER',
+      photo: photo || null,
+    };
+
+    let user;
+    if (role === 'DISPATCHER') {
+      user = await this.prisma.user.create({
+        data: {
+          ...userData,
+          dispatcher: {
+            create: {
+              name: name || 'Dispatcher',
+              phone: null,
+              address: null,
+              photo: photo || null,
+            },
+          },
+        },
+        include: { dispatcher: true },
+      });
+    } else {
+      user = await this.prisma.user.create({ data: userData });
+    }
 
     return {
       user: {
@@ -68,6 +86,7 @@ export class AuthService {
 
     const user = await this.prisma.user.findUnique({
       where: { email },
+      include: { dispatcher: true },
     });
 
     if (!user) throw new UnauthorizedException('Invalid credentials');
@@ -82,7 +101,7 @@ export class AuthService {
     // Check session limit (allow max 100 simultaneous sessions)
     await this.enforceSessionLimit(user.id, 100);
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role);
+    const tokens = await this.generateTokens(user.id, user.email, user.role, user.dispatcher?.id);
     await this.createSession(user.id, tokens.refreshToken);
 
     return {
@@ -307,12 +326,16 @@ export class AuthService {
   }
 
   // * generate token
-  private async generateTokens(userId: string, email: string, role: string) {
-    const payload: JwtPayload = {
+  private async generateTokens(userId: string, email: string, role: string, dispatcherId?: string) {
+    const payload: any = {
       sub: userId, // Use 'sub' instead of 'id'
       email,
       role,
     };
+
+    if (dispatcherId) {
+      payload.dispatcherId = dispatcherId;
+    }
 
     const accessToken = await this.jwtService.signAsync(payload, {
       secret: process.env.JWT_SECRET || '1e7449b52f6582bc87373bf6ed8db58e5a59',

@@ -144,4 +144,83 @@ export class MailService {
   </div>
   `;
   }
+
+  // Send welcome email to newly created dispatcher with login credentials
+  async sendDispatcherWelcomeEmail(
+    email: string,
+    name: string,
+    password: string,
+  ): Promise<void> {
+    const loginUrl = `${process.env.CLIENT_URL}/login`;
+
+    const mailOptions: nodemailer.SendMailOptions = {
+      from: `"Dispatch Bros" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Welcome to Dispatch Bros - Your Account Details',
+      html: this.buildDispatcherWelcomeTemplate(name, email, password, loginUrl),
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      this.logger.log(`✅ Dispatcher welcome email sent to: ${email}`);
+    } catch (error) {
+      this.logger.error(`❌ Failed to send welcome email to ${email}`, error.stack);
+      throw new InternalServerErrorException(
+        'Failed to send welcome email. Please contact support for your login credentials.',
+      );
+    }
+  }
+
+  private buildDispatcherWelcomeTemplate(
+    name: string,
+    email: string,
+    password: string,
+    loginUrl: string,
+  ): string {
+    return `
+      <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f6f8; padding: 40px 0; text-align: center;">
+        <div style="max-width: 600px; background: #ffffff; margin: auto; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+          <div style="background: #111827; padding: 24px;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Dispatch Bros</h1>
+          </div>
+          <div style="padding: 32px 24px; color: #374151; text-align: left;">
+            <h2 style="margin-bottom: 16px; color: #111827;">Welcome to the Team, ${name}!</h2>
+            <p style="font-size: 15px; line-height: 1.6;">
+              Your dispatcher account has been successfully created by the administrator. 
+              You can now access the Dispatch Bros platform using the credentials below.
+            </p>
+            
+            <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin: 24px 0; border-left: 4px solid #2563eb;">
+              <h3 style="margin: 0 0 12px 0; color: #111827; font-size: 16px;">Your Login Credentials</h3>
+              <p style="margin: 8px 0; font-size: 14px;">
+                <strong style="color: #111827;">Email:</strong> <code style="background: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${email}</code>
+              </p>
+              <p style="margin: 8px 0; font-size: 14px;">
+                <strong style="color: #111827;">Password:</strong> <code style="background: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${password}</code>
+              </p>
+            </div>
+
+            <a href="${loginUrl}" 
+              style="display: inline-block; margin: 16px 0; padding: 12px 24px; background: #2563eb; color: #fff; border-radius: 8px; text-decoration: none; font-weight: 500;">
+              Login to Dashboard
+            </a>
+
+            <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin-top: 24px;">
+              <p style="margin: 0; font-size: 14px; color: #92400e;">
+                <strong>⚠️ Security Reminder:</strong> For your security, please change your password after your first login. 
+                Keep your credentials confidential and do not share them with anyone.
+              </p>
+            </div>
+
+            <p style="font-size: 14px; color: #6b7280; margin-top: 24px;">
+              If you have any questions or need assistance, please contact your administrator.
+            </p>
+          </div>
+          <div style="background: #f9fafb; padding: 16px; font-size: 12px; color: #9ca3af;">
+            <p>© ${new Date().getFullYear()} Dispatch Bros. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    `;
+  }
 }

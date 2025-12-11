@@ -15,7 +15,7 @@ export class DefaultTimeSlotController {
 
     @Post('create')
     @UseGuards(AuthGuard, RolesGuard)
-    @AuthRoles(UserRole.ADMIN)
+    @AuthRoles(UserRole.DISPATCHER)
     async create(
         @Body() createDto: CreateDefaultTimeSlotDto,
         @Res() res: Response,
@@ -44,7 +44,7 @@ export class DefaultTimeSlotController {
 
     @Patch('update/:id')
     @UseGuards(AuthGuard, RolesGuard)
-    @AuthRoles(UserRole.ADMIN)
+    @AuthRoles(UserRole.DISPATCHER)
     async update(
         @Param('id') id: string,
         @Body() updateDto: UpdateDefaultTimeSlotDto,
@@ -98,7 +98,7 @@ export class DefaultTimeSlotController {
 
     @Delete('delete/:id')
     @UseGuards(AuthGuard, RolesGuard)
-    @AuthRoles(UserRole.ADMIN)
+    @AuthRoles(UserRole.DISPATCHER)
     async remove(@Param('id') id: string, @Res() res: Response) {
         try {
             const result = await this.service.remove(id);
