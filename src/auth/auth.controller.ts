@@ -10,8 +10,13 @@ import {
   UnauthorizedException,
   UseGuards,
   UsePipes,
+  UseInterceptors,
+  UploadedFile,
   ValidationPipe,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
 import { AuthService } from './auth.service';
 import type { Response } from 'express';
 import { RegisterDto } from './dto/register.dto';
@@ -29,12 +34,33 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @UseInterceptors(
+    FileInterceptor('photo', {
+      storage: diskStorage({
+        destination: join(__dirname, '..', '..', 'uploads'),
+        filename: (req, file, cb) => {
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+    }),
+  )
   @UsePipes(new ValidationPipe())
   async register(
-    @Body() userRegistrationData: RegisterDto,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('data') data: string,
     @Res() res: Response,
   ) {
     try {
+      // Parse the JSON string
+      const userRegistrationData: RegisterDto = JSON.parse(data);
+
+      // Add the photo path if uploaded
+      if (file) {
+        userRegistrationData.photo = `/uploads/${file.filename}`;
+      }
+
       const { user } = await this.authService.register(userRegistrationData);
       return res
         .status(HttpStatus.CREATED)
@@ -47,6 +73,18 @@ export class AuthController {
           ),
         );
     } catch (error) {
+      if (error instanceof SyntaxError) {
+        return res
+          .status(HttpStatus.BAD_REQUEST)
+          .json(
+            sendResponse(
+              HttpStatus.BAD_REQUEST,
+              false,
+              'Invalid JSON data provided',
+              null,
+            ),
+          );
+      }
       const status = error.status || error.statusCode || HttpStatus.BAD_REQUEST;
       return res
         .status(status)

@@ -58,7 +58,7 @@ export class JobsController {
   // update job (status update included)
   @Patch('update/:id')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.DISPATCHER)
+  @AuthRoles(UserRole.ADMIN, UserRole.DISPATCHER)
   @HttpCode(200)
   async updateJob(@Param('id') id: string, @Body() updateJobDto: UpdateJobDto) {
     return this.jobsService.updateJob(id, updateJobDto);
@@ -66,7 +66,7 @@ export class JobsController {
 
   @Delete('delete/:id')
   @UseGuards(AuthGuard, RolesGuard)
-  @AuthRoles(UserRole.DISPATCHER)
+  @AuthRoles(UserRole.ADMIN, UserRole.DISPATCHER)
   @HttpCode(200)
   async deleteJob(@Param('id') id: string) {
     return this.jobsService.deleteJob(id);
