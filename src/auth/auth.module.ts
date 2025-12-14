@@ -5,7 +5,6 @@ import { JwtModule } from '@nestjs/jwt';
 import { PrismaModule } from 'prisma/prisma.module';
 import { AuthGuard } from './guards/jwt-auth-guard';
 import { MailService } from 'src/mail/mail.service';
-import { DispatcherSeeder } from './seed/admin.seeder';
 
 @Module({
   imports: [
@@ -16,7 +15,7 @@ import { DispatcherSeeder } from './seed/admin.seeder';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, AuthGuard,MailService, DispatcherSeeder],
+  providers: [AuthService, AuthGuard, MailService],
   exports: [AuthService],
 })
 export class AuthModule {}
