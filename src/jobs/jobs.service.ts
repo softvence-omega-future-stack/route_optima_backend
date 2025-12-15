@@ -572,6 +572,15 @@ export class JobsService {
           state: parsedAddress.state,
           stateCode: parsedAddress.stateCode,
         };
+
+        // If address changed but lat/long not provided, geocode the new address
+        if (!updateJobDto.latitude || !updateJobDto.longitude) {
+          const geo = await this.geocoderUtil.geocodeAddress(updateJobDto.serviceAddress);
+          if (geo) {
+            updateData.latitude = geo.latitude;
+            updateData.longitude = geo.longitude;
+          }
+        }
       }
 
       // Validate technician if provided
