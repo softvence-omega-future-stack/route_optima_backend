@@ -13,8 +13,18 @@
     "strictNullChecks": true,
     "outDir": "./dist",
     "baseUrl": "./",
-    "types": ["node", "express", "multer"]
+    "types": [
+      "node",
+      "express",
+      "multer",
+      "jest"
+    ]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

@@ -91,6 +91,13 @@ export class AuthService {
 
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
+    // Check if dispatcher is inactive
+    if (user.role === 'DISPATCHER' && user.dispatcher && !user.dispatcher.isActive) {
+      throw new UnauthorizedException(
+        'Your account is inactive. Please contact support.',
+      );
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid)
       throw new UnauthorizedException('Invalid credentials');

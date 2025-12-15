@@ -87,7 +87,7 @@ export class MailService {
     const mailOptions: nodemailer.SendMailOptions = {
       from: `"Dispatch Bros" <${process.env.EMAIL_USER}>`,
       to: job.customerEmail,
-      subject: `Your Job is Confirmed – Dispatch Bros`,
+      subject: `Job Confirmation Notice – Dispatch Bros`,
       html: this.buildJobConfirmationTemplate(job, technician),
     };
 
@@ -111,7 +111,7 @@ export class MailService {
       </div>
 
       <div style="padding:28px;">
-        <h2 style="color:#111827; margin-bottom:12px;">Your Job is Confirmed</h2>
+        <h2 style="color:#111827; margin-bottom:12px;">Your Scheduled Service Is Confirmed</h2>
         <p style="color:#4b5563; font-size:15px;">
           Your booking has been successfully scheduled. Below are your job and technician details:
         </p>
