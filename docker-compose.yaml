@@ -2,7 +2,7 @@
 services:
   app:
     container_name: route-optima-backend
-    image: sakibsakib/route-optima:latest
+    image: rockyhaque/route-optima:latest
     build: .
     ports:
       - '3008:3008'

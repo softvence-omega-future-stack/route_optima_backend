@@ -1,37 +1,33 @@
-# Stage 1: Build
+# Build stage
 FROM node:20-alpine AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Copy package files first (for efficient caching)
 COPY package*.json ./
+COPY prisma ./prisma/
 
-# Install dependencies
 RUN npm ci
 
-# Copy all files
 COPY . .
 
 RUN npx prisma generate
-# Build the project
 RUN npm run build
 
-# Stage 2: Run
-FROM node:20-alpine AS runner
+# Production stage
+FROM node:20-alpine
+
 WORKDIR /app
 
-# Copy only built files and necessary assets
+COPY package*.json ./
+COPY prisma ./prisma/
+
+RUN npm ci --only=production
+
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-# Install only production dependencies
-RUN npm ci 
+RUN mkdir -p uploads
 
-# Expose Nest default port
 EXPOSE 3008
 
-# Run the app
-CMD ["node", "dist/main.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
