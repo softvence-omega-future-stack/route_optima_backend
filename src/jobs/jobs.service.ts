@@ -616,6 +616,13 @@ export class JobsService {
         }
       }
 
+      // Handle job completion financials
+      if (updateJobDto.status === JobStatus.COMPLETED) {
+        const total = updateJobDto.totalAmount ?? (existingJob as any).totalAmount ?? 0;
+        const parts = updateJobDto.partsCost ?? (existingJob as any).partsCost ?? 0;
+        updateData.techProfit = (total - parts) / 2;
+      }
+
       // Update the job
       const updatedJob = await this.prisma.job.update({
         where: { id },

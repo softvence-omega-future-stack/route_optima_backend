@@ -162,6 +162,12 @@ model Job {
   creator                                       User?           @relation("JobCreator", fields: [createdBy], references: [id])
 
   status                                        JobStatus        @default(ASSIGNED)
+  
+  // Financial Information
+  totalAmount                                   Float?
+  partsCost                                     Float?
+  techProfit                                    Float?
+
   createdAt                                     DateTime         @default(now())
   updatedAt                                     DateTime         @updatedAt
 }
