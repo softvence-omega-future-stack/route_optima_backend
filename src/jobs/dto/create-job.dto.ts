@@ -1,4 +1,5 @@
-import { IsString, IsEmail, IsOptional, IsDate, IsNumber } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsDate, IsNumber, IsEnum } from 'class-validator';
+import { JobType } from '@prisma/client';
 import { Type } from 'class-transformer';
 
 export class CreateJobDto {
@@ -21,6 +22,18 @@ export class CreateJobDto {
   zipCode?: string;
   
   // Job Details
+  @IsOptional()
+  @IsString()
+  companyName?: string;
+
+  @IsOptional()
+  @IsString()
+  jobSource?: string;
+
+  @IsOptional()
+  @IsEnum(JobType)
+  jobType?: JobType;
+
   @IsString()
   jobDescription: string;
   

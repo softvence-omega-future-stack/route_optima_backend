@@ -181,7 +181,10 @@ export class JobsService {
           zipCode: parsedAddress.zipCode ?? createJobDto.zipCode,
 
           jobDescription: createJobDto.jobDescription,
-          scheduledDate: createJobDto.scheduledDate,
+        companyName: createJobDto.companyName,
+        jobSource: createJobDto.jobSource,
+        jobType: createJobDto.jobType,
+        scheduledDate: createJobDto.scheduledDate,
 
           timeSlotId: createJobDto.timeSlotId,
           technicianId: createJobDto.technicianId,

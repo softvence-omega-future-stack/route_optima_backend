@@ -1,4 +1,4 @@
-import { JobStatus } from "@prisma/client";
+import { JobStatus, JobType } from "@prisma/client";
 import { Type } from "class-transformer";
 import { IsDate, IsEmail, IsEnum, IsNumber, IsOptional, IsString } from "class-validator";
 
@@ -26,6 +26,18 @@ export class UpdateJobDto {
   @IsOptional()
   @IsString()
   jobDescription?: string;
+
+  @IsOptional()
+  @IsString()
+  companyName?: string;
+
+  @IsOptional()
+  @IsString()
+  jobSource?: string;
+
+  @IsOptional()
+  @IsEnum(JobType)
+  jobType?: JobType;
 
   @IsOptional()
   @IsDate()

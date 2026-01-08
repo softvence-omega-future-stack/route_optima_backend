@@ -24,6 +24,12 @@ enum JobStatus {
   COMPLETED
 }
 
+enum JobType {
+  CHIMNEY_SWEEP
+  LOCKSMITH
+  DRYER_VENT_CLEANING
+}
+
 model User {
   id                 String                @id @default(uuid())
   email              String                @unique
@@ -135,6 +141,9 @@ model Job {
   longitude                                     Float?
 
   // Job Details
+  companyName                                   String?
+  jobSource                                     String?
+  jobType                                       JobType?
   jobDescription                                String
 
   // Schedule Information (already in Job - perfect!)
