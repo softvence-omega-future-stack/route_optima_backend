@@ -181,7 +181,10 @@ export class JobsService {
           zipCode: parsedAddress.zipCode ?? createJobDto.zipCode,
 
           jobDescription: createJobDto.jobDescription,
-          scheduledDate: createJobDto.scheduledDate,
+        companyName: createJobDto.companyName,
+        jobSource: createJobDto.jobSource,
+        jobType: createJobDto.jobType,
+        scheduledDate: createJobDto.scheduledDate,
 
           timeSlotId: createJobDto.timeSlotId,
           technicianId: createJobDto.technicianId,
@@ -611,6 +614,13 @@ export class JobsService {
             null,
           );
         }
+      }
+
+      // Handle job completion financials
+      if (updateJobDto.status === JobStatus.COMPLETED) {
+        const total = updateJobDto.totalAmount ?? (existingJob as any).totalAmount ?? 0;
+        const parts = updateJobDto.partsCost ?? (existingJob as any).partsCost ?? 0;
+        updateData.techProfit = (total - parts) / 2;
       }
 
       // Update the job

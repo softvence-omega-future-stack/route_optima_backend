@@ -1,4 +1,4 @@
-import { JobStatus } from "@prisma/client";
+import { JobStatus, JobType } from "@prisma/client";
 import { Type } from "class-transformer";
 import { IsDate, IsEmail, IsEnum, IsNumber, IsOptional, IsString } from "class-validator";
 
@@ -28,6 +28,18 @@ export class UpdateJobDto {
   jobDescription?: string;
 
   @IsOptional()
+  @IsString()
+  companyName?: string;
+
+  @IsOptional()
+  @IsString()
+  jobSource?: string;
+
+  @IsOptional()
+  @IsEnum(JobType)
+  jobType?: JobType;
+
+  @IsOptional()
   @IsDate()
   @Type(() => Date)
   scheduledDate?: Date;
@@ -51,4 +63,12 @@ export class UpdateJobDto {
   @IsOptional()
   @IsNumber()
   longitude?: number;
+
+  @IsOptional()
+  @IsNumber()
+  totalAmount?: number;
+
+  @IsOptional()
+  @IsNumber()
+  partsCost?: number;
 }

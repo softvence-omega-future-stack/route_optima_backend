@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Job" ADD COLUMN     "partsCost" DOUBLE PRECISION,
+ADD COLUMN     "techProfit" DOUBLE PRECISION,
+ADD COLUMN     "totalAmount" DOUBLE PRECISION;
